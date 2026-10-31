@@ -85,13 +85,18 @@ priority, and the 3,500-token budget splits within that order. This keeps
 neighbours meaningful and stopped the 1.5b model from mixing `src/flask` files
 with unrelated example templates.
 
-### B3. Default model is `qwen2.5-coder:3b` (step 13)
+### B3. Default model is `lfm3:1.7b` (step 13)
 
-Under conservative grading no candidate reached 80 percent correct on the
-15-file flask corpus, so section 10's fallback applies: use the quality
-reference. `qwen2.5-coder:3b` also produced the only run with zero wrong
-descriptions and no filename/vague filler. `--fast` keeps 1.5b available at
-about 3.7 s versus 8.1 s for the same 15 files.
+With prompt v2 and conservative grading, `lfm3:1.7b` scored 87 percent correct
+on the 15-file flask corpus at an 8.2 s median, so the section 10 rule selects
+it as the fastest model at or above 80 percent. `qwen2.5-coder:3b` (9.4 s,
+73 percent) remains the reference and escalation model, and `--fast` uses
+`qwen2.5-coder:1.5b` (4.9 s, 73 percent).
+
+Real-project check: `src/click` cold runs measured 11.9 to 16.2 s (median
+15.2 s), inside the 20 s target. lfm3's decode dominates, so its advantage
+depends on how concisely it answers; the benchmark and the real run are both
+reported in BENCHMARKS.md.
 
 ### B4. Escalation is one extra request, capped (step 10)
 
@@ -109,12 +114,28 @@ real runs: `ollama ps` is empty after exit.
 
 ### B6. Benchmark note: one transient 3b 500
 
-The first 3b benchmark attempt got HTTP 500 from the Ollama runner (the server
-process restarted). A single rerun of all three 3b runs succeeded; those values
-are reported. The 1.5b/1.7b results are from the first pass. This is recorded
-in BENCHMARKS.md rather than hidden.
+The first 3b benchmark attempt got HTTP 500 from the Ollama runner while the
+server process restarted. A rerun of all three 3b runs succeeded; the table
+uses those values. The benchmark material (prompt v2, tolerant parser) is the
+same for every model. This is recorded in BENCHMARKS.md rather than hidden.
 
-### B7. Benchmark material is local and untracked
+### B7. Prompt v2 adds worked examples; the parser tolerates `File N|`
+
+Small models copied the literal placeholder `N` and echoed file names until the
+system prompt included two worked `-> N|...` examples. That raised lfm3 and 3b
+from "filename repetition" to usable descriptions. lfm3 in turn prefixes lines
+with `File `, so the parser accepts `File 3|...` and `-> 3|...` as well as
+`3|...`. Prompt version is now 2, which invalidates v1 cache entries.
+
+### B8. Rejected descriptions are cached as fallbacks
+
+A file that passes through AI analysis but fails every quality check is cached
+with its deterministic fallback (tier 0, keyed by the model and prompt version).
+Without this, one permanently rejected file (`helpers.py`) made every warm run
+send a request and cost about 4 s. Budget/connection stops are not cached, so a
+rerun still makes progress. `--no-ai` still never writes fallbacks (A5).
+
+### B9. Benchmark material is local and untracked
 
 `.bench/` holds the cloned `pallets/flask` corpus, the 15-file subset, the
 benchmark script and raw results. It is in `.gitignore`; only the summarized

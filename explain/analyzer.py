@@ -38,7 +38,17 @@ Rules:
 - Never write the file name and never start with "This file".
 - Use only the evidence given. Do not invent functionality.
 - If the purpose is unclear, write: <number>|unclear
-- No extra text, no markdown, no backticks."""
+- No extra text, no markdown, no backticks.
+
+Examples:
+FILE 1: billing/invoice.py
+Classes: Invoice
+Functions: Invoice.total, Invoice.render
+-> 1|Builds and totals customer invoices
+
+FILE 2: cli/entry.py
+Functions: main, build_parser
+-> 2|Command-line entry point that parses arguments and runs the app"""
 
 VAGUE_TERMS = (
     "various",
@@ -51,7 +61,7 @@ VAGUE_TERMS = (
     "handles things",
 )
 
-LINE = re.compile(r"^\s*(\d+)\s*\|\s*(.+?)\s*$")
+LINE = re.compile(r"^\s*(?:->\s*)?(?i:file\s+)?(\d+)\s*\|\s*(.+?)\s*$")
 FENCE = re.compile(r"^```[a-zA-Z]*\s*|\s*```$", re.MULTILINE)
 
 MAX_ESCALATIONS = 6
@@ -189,14 +199,20 @@ def analyse(ctx) -> AnalysisSummary:
         described_total += summary.escalated
 
     missing = [entry for entry in entries if entry.path not in ctx.descriptions]
+    rejected = {entry.path for entry in failed}
     if missing:
-        _fill_fallbacks(ctx)
+        _fill_fallbacks(
+            ctx,
+            cache_paths=rejected if summary.stopped in {"", "incomplete"} else None,
+        )
     if missing and not summary.stopped:
         summary.stopped = "incomplete"
     summary.described = described_total
     summary.failed = len(missing)
     ctx.stats.analysed_by_ai = described_total
-    ctx.stats.pending = len(missing)
+    ctx.stats.pending = (
+        len(missing) if summary.stopped in {"budget", "connection", "model"} else 0
+    )
 
     cleanup_started = time.perf_counter()
     try:
@@ -396,13 +412,23 @@ def _escalate(ctx, manager, failed: list, summary: AnalysisSummary) -> int:
         cfg.model = model
 
 
-def _fill_fallbacks(ctx) -> None:
+def _fill_fallbacks(ctx, cache_paths: set[str] | None = None) -> None:
     for entry in ctx.pending:
         if entry.path in ctx.descriptions:
             continue
-        ctx.descriptions[entry.path] = fallback_description(ctx.metas[entry.path])
+        description = fallback_description(ctx.metas[entry.path])
+        ctx.descriptions[entry.path] = description
         ctx._fallback_paths.add(entry.path)
         ctx.stats.fallbacks += 1
+        if cache_paths and entry.path in cache_paths:
+            ctx.cache.put_file(
+                entry.path,
+                entry.digest,
+                ctx.cfg.model,
+                0,
+                description,
+                ctx.cfg.prompt_version,
+            )
 
 
 def parse_descriptions(text: str, batch: Batch, cfg: Config) -> dict[str, str]:

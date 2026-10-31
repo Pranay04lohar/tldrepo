@@ -272,6 +272,9 @@ def test_parse_numbered_lines():
         "src/a.py": "Parses things",
         "lib/b.py": "Renders output",
     }
+    assert parse_descriptions(
+        "File 2|Renders output\nFile 1|Parses things", batch, cfg
+    ) == {"src/a.py": "Parses things", "lib/b.py": "Renders output"}
     assert parse_descriptions("no answer here", batch, cfg) == {}
     assert parse_descriptions("1|unclear\n2|various utilities", batch, cfg) == {}
 
@@ -385,3 +388,22 @@ def test_retry_stub_returns_parsed_after_error(repo):
     parsed, usage = _describe_with_retry(Manager(), ctx.cfg, batch, ctx)
     assert set(parsed.values()) == {"Recovered description"}
     assert usage.requests == 1
+
+
+def test_rejected_fallback_is_cached_so_warm_run_is_silent(fake, repo, tmp_path):
+    root = tmp_path / "one"
+    root.mkdir()
+    (root / "helpers.py").write_text("def helper(value):\n    return value\n")
+    fake.chat_output = "1|unclear"
+    ctx = make_ctx(root)
+    summary = analyzer.analyse(ctx)
+    assert summary.failed == 1
+    assert ctx.stats.fallbacks == 1
+    ctx.cache.save()
+
+    before = len(chat_requests(fake))
+    ctx2 = make_ctx(root)
+    assert ctx2.pending == []
+    assert ctx2.stats.from_cache == 1
+    assert ctx2.descriptions["helpers.py"].startswith("Python module:")
+    assert len(chat_requests(fake)) == before

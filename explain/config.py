@@ -6,11 +6,11 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-DEFAULT_MODEL = "qwen2.5-coder:3b"
+DEFAULT_MODEL = "lfm3:1.7b"
 FAST_MODEL = "qwen2.5-coder:1.5b"
 REFERENCE_MODEL = "qwen2.5-coder:3b"
 
-PROMPT_VERSION = 1
+PROMPT_VERSION = 2
 CACHE_VERSION = 2
 
 OLLAMA_DEFAULT_HOST = "http://127.0.0.1:11434"

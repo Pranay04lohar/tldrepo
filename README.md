@@ -15,10 +15,14 @@ rules when Python can answer better.
 ## Install
 
 ```bash
-cd ~/projects/explain-cli
+cd /Users/pranay/Dev:AI/AI_Engineering/Projects/explain-cli
 uv sync
-uv run python -m explain --help
+.venv/bin/python -m explain --help
 ```
+
+`uv run` is not used here because this checkout's path contains `:`, which uv
+rejects when resolving the project path. Module execution from the venv is the
+supported entry point and is what the Zsh function calls.
 
 ## Usage
 
@@ -40,7 +44,10 @@ uv run python -m explain --help
 
 - Deterministic Python does traversal, hierarchy, language detection, hashing,
   AST and regex skeletons, tiering, caching, rendering and answer validation.
-- The model only turns a ~200-token skeleton into one short description.
+- The model only turns a compact skeleton into one short description per file.
+- Default model: `lfm3:1.7b` (1.7 GB, nvfp4), chosen by the benchmark as the
+  fastest model scoring at least 80% correct. `--fast` uses
+  `qwen2.5-coder:1.5b`; rejected answers escalate once to `qwen2.5-coder:3b`.
 - Input to the model is skeleton, never full source (unless the file is tiny).
 - Cache lives in `<repo>/.explain/cache.json` and never contains source code.
 - The tool starts an Ollama server only if none is running, and stops only the
@@ -49,5 +56,5 @@ uv run python -m explain --help
 ## Tests
 
 ```bash
-uv run pytest
+.venv/bin/python -m pytest
 ```
