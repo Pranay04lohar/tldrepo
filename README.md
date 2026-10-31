@@ -47,7 +47,8 @@ supported entry point and is what the Zsh function calls.
 - The model only turns a compact skeleton into one short description per file.
 - Default model: `lfm3:1.7b` (1.7 GB, nvfp4), chosen by the benchmark as the
   fastest model scoring at least 80% correct. `--fast` uses
-  `qwen2.5-coder:1.5b`; rejected answers escalate once to `qwen2.5-coder:3b`.
+  `qwen2.5-coder:1.5b`. Rejected answers are retried once on the same model
+  with more source, then fall back to a deterministic description.
 - Input to the model is skeleton, never full source (unless the file is tiny).
 - Cache lives in `<repo>/.explain/cache.json` and never contains source code.
 - The tool starts an Ollama server only if none is running, and stops only the

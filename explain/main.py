@@ -15,7 +15,6 @@ from pathlib import Path
 from .cache import Cache
 from .config import (
     FAST_MODEL,
-    REFERENCE_MODEL,
     Config,
     apply_project_config,
     load_project_config,
@@ -60,11 +59,6 @@ def build_parser() -> argparse.ArgumentParser:
         "--budget", type=float, default=25.0, help="time budget in seconds (default 25)"
     )
     parser.add_argument("--timing", action="store_true", help="show per-phase timings")
-    parser.add_argument(
-        "--reference",
-        action="store_true",
-        help=f"use the quality reference model ({REFERENCE_MODEL})",
-    )
     return parser
 
 
@@ -127,8 +121,6 @@ def run(argv: list[str] | None = None) -> int:
     apply_project_config(cfg, load_project_config(root))
     if args.model:
         cfg.model = args.model
-    elif args.reference:
-        cfg.model = REFERENCE_MODEL
     elif args.fast:
         cfg.model = FAST_MODEL
     cfg.no_ai = args.no_ai

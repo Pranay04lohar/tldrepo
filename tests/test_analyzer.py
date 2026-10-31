@@ -140,9 +140,10 @@ def test_malformed_json_retries_then_falls_back(fake, repo):
     ctx = make_ctx(repo)
     ctx.cfg.model = "qwen2.5-coder:3b"
     summary = analyzer.analyse(ctx)
-    assert len(chat_requests(fake)) == 2
+    assert len(chat_requests(fake)) == 4  # first attempt + one source-rich retry
     assert summary.stopped == "incomplete"
-    assert ctx.stats.batch_failures == 1
+    assert ctx.stats.batch_failures == 2
+    assert {r["payload"]["model"] for r in chat_requests(fake)} == {"qwen2.5-coder:3b"}
     assert ctx.stats.fallbacks == 3
     assert all("module" in ctx.descriptions[e.path].lower() for e in ctx.pending)
 
@@ -339,26 +340,98 @@ def test_generic_description_is_not_committed(fake, repo):
     assert "Handles values" not in ctx.descriptions.get("src/mod0.py", "")
 
 
-def test_escalation_uses_reference_model(fake, repo, monkeypatch):
-    ctx = make_ctx(repo)
-    ctx.cfg.model = "qwen2.5-coder:1.5b"
-    small = ctx.cfg.model
-    seen_models = []
+def large_module(root: Path, marker: str) -> None:
+    body = "".join(f"    value_{index} = {index}\n" for index in range(50))
+    (root / "large.py").write_text(
+        '"""Large helper module."""\n\n\n'
+        "def alpha(value):\n"
+        + body
+        + f'    return "{marker}"\n'
+    )
 
-    class FlakyManager(analyzer.OllamaManager):
-        def chat(self, model, *args, **kwargs):
-            seen_models.append(model)
-            if model == small:
-                return {"message": {"content": "not json"}, "prompt_eval_count": 1, "eval_count": 1}
-            return super().chat(model, *args, **kwargs)
 
-    manager_cls = analyzer.OllamaManager
-    monkeypatch.setattr(analyzer, "OllamaManager", lambda cfg: FlakyManager(cfg=cfg))
+def test_retry_uses_same_model_with_more_source(tmp_path, monkeypatch):
+    root = tmp_path / "retry"
+    root.mkdir()
+    large_module(root, "UNIQUE_SNIPPET_42")
+    ctx = make_ctx(root)
+    ctx.cfg.model = "lfm3:1.7b"
+    calls = []
+
+    class Manager:
+        last_model = None
+
+        def ensure_running(self):
+            return False
+
+        def load_model(self, model):
+            pass
+
+        def unload_model(self, model=None):
+            pass
+
+        def cleanup(self):
+            pass
+
+        def chat(self, model, messages, **kwargs):
+            prompt = messages[-1]["content"]
+            calls.append((model, prompt))
+            if "UNIQUE_SNIPPET_42" in prompt:
+                content = "1|Handles unique snippets"
+            else:
+                content = "1|This file"
+            return {
+                "message": {"content": content},
+                "prompt_eval_count": 10,
+                "eval_count": 5,
+            }
+
+    monkeypatch.setattr(analyzer, "OllamaManager", lambda cfg: Manager())
     summary = analyzer.analyse(ctx)
-    analyzer.OllamaManager = manager_cls
-    assert summary.escalated == 3
-    assert "qwen2.5-coder:3b" in seen_models
-    assert all(ctx.descriptions[e.path] == "Fake description" for e in ctx.pending)
+    assert summary.retried == 1
+    assert [model for model, _ in calls] == ["lfm3:1.7b"] * 3
+    assert "UNIQUE_SNIPPET_42" not in calls[0][1]
+    assert "UNIQUE_SNIPPET_42" in calls[2][1]
+    assert ctx.descriptions["large.py"] == "Handles unique snippets"
+
+
+def test_failed_retry_falls_back_without_switching_models(tmp_path, monkeypatch):
+    root = tmp_path / "retry-fail"
+    root.mkdir()
+    large_module(root, "STILL_UNKNOWN")
+    ctx = make_ctx(root)
+    ctx.cfg.model = "lfm3:1.7b"
+    models = []
+
+    class Manager:
+        last_model = None
+
+        def ensure_running(self):
+            return False
+
+        def load_model(self, model):
+            pass
+
+        def unload_model(self, model=None):
+            pass
+
+        def cleanup(self):
+            pass
+
+        def chat(self, model, messages, **kwargs):
+            models.append(model)
+            return {
+                "message": {"content": "1|This file"},
+                "prompt_eval_count": 10,
+                "eval_count": 5,
+            }
+
+    monkeypatch.setattr(analyzer, "OllamaManager", lambda cfg: Manager())
+    summary = analyzer.analyse(ctx)
+    assert summary.retried == 0
+    assert summary.failed == 1
+    assert set(models) == {"lfm3:1.7b"}
+    assert ctx.descriptions["large.py"].startswith("Python module: alpha")
 
 
 def test_retry_stub_returns_parsed_after_error(repo):

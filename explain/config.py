@@ -8,7 +8,6 @@ from pathlib import Path
 
 DEFAULT_MODEL = "lfm3:1.7b"
 FAST_MODEL = "qwen2.5-coder:1.5b"
-REFERENCE_MODEL = "qwen2.5-coder:3b"
 
 PROMPT_VERSION = 2
 CACHE_VERSION = 2

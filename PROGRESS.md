@@ -15,7 +15,7 @@ Gate A: 90 tests pass; `explain --no-ai` renders this repo in 0.02 s.
 
 ## Phase B: Ollama, batching, cache, benchmark (steps 9 to 13)
 
-Gate B: 120 tests pass (including a fake-Ollama HTTP server for lifecycle and
+Gate B: 121 tests pass (including a fake-Ollama HTTP server for lifecycle and
 request-shape tests); real runs on `pallets/flask` (226 files) and
 `pallets/click` (17-file target) completed and left `ollama ps` empty; the
 benchmark is in BENCHMARKS.md.
@@ -24,7 +24,7 @@ benchmark is in BENCHMARKS.md.
   (reuse vs ownership, readiness timeout, safe env, keep_alive 0, unload,
   verify with /api/ps, terminate/wait/kill, atexit + signal cleanup)
 - [x] Step 10: analyzer (directory-grouped batching, numbered prompts, quality
-  checks, one retry, escalation, cache after each batch, time budget)
+  checks, one retry with more source, cache after each batch, time budget)
 - [x] Step 11: Rich progress line, footer counters, `--timing` phases
   (scan, metadata, load, prefill, decode, cleanup, render)
 - [x] Step 12: real end-to-end run; warm `--no-ai` 0.16 s; model unloaded
@@ -36,5 +36,5 @@ benchmark is in BENCHMARKS.md.
 - [x] Step 14: Zsh integration (`~/.zshrc` marked block, backup, diff shown,
   `zsh -i` verified from a `/tmp` test repo)
 - [x] Step 15: measurement protocol on `pallets/click` (`src/click`, 17 files):
-  cold 15.20 s, warm 0.23 s, five modified 4.27 s; `ollama ps` empty
+  cold 10.68 s, warm 0.12 s, five modified 2.88 s; `ollama ps` empty
 - [x] Step 16: final report (`REPORT.md`); **Gate C passed**

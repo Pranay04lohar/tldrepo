@@ -1,7 +1,7 @@
 """File tiers, deterministic descriptions and directory labels.
 
 Tier 0 answers without a model. Tier 1 is the only normal model path. Tier 2 is
-a rare escalation when a Tier 1 answer fails a deterministic quality check.
+a rare retry when a Tier 1 answer fails a deterministic quality check.
 """
 
 from __future__ import annotations

@@ -31,7 +31,7 @@ One first-pass 3b request returned HTTP 500 while the runner restarted; the
 rerun succeeded and the table uses the successful three runs.
 
 **Decision:** `lfm3:1.7b` is the fastest model at or above 80 percent correct,
-so it is the default. `qwen2.5-coder:3b` stays the reference/escalation model,
+so it is the default. `qwen2.5-coder:3b` is kept for benchmark comparison only,
 and `--fast` uses `qwen2.5-coder:1.5b`.
 
 ## Measurement protocol
@@ -42,14 +42,16 @@ target `src/click` (17 Python source files after filtering). Default model
 
 | Scenario | Target | Measured (median of 3) | Per-phase (scan / load / prefill / decode / cleanup / render) |
 | --- | --- | --- | --- |
-| Cold, 17 files | < 20 s | **15.20 s** (11.86, 15.20, 16.17) | 0.00 / 0.92 / 2.31 / 8.05 / 0.02 / 0.00 |
-| Warm, nothing changed | < 2 s | **0.23 s** (0.31, 0.23, 0.20) | 0.00 / 0 / 0 / 0 / 0 / 0.00 |
-| Five modified files | < 12 s | **4.27 s** (4.29, 4.27, 3.69) | 0.00 / 0.71 / 0.40 / 2.82 / 0.02 / 0.00 |
+| Cold, 17 files | < 20 s | **10.68 s** (11.55, 10.68, 10.57) | 0.00 / 0.52 / 1.87 / 6.70 / 0.01 / 0.00 |
+| Warm, nothing changed | < 2 s | **0.12 s** (0.15, 0.12, 0.11) | 0.00 / 0 / 0 / 0 / 0 / 0.00 |
+| Five modified files | < 12 s | **2.88 s** (2.85, 2.88, 2.89) | 0.00 / 0.51 / 0.33 / 1.84 / 0.01 / 0.00 |
 | Model resident after exit | zero | zero (`ollama ps` empty) | — |
 | Ollama process we started left running | none | none from our `Popen` handle | — |
 
-Cold runs vary because lfm3 output length varies (11.9 to 16.2 s), but all
-stay under the 20 s target and the 25 s budget. The warm runs made zero requests
+Cold runs vary because lfm3 output length varies (10.6 to 11.6 s here, 11.9 to
+16.2 s in an earlier pass), but all stay under the 20 s target and the 25 s
+budget. These numbers were re-measured after the reference-model path was
+removed and failures now retry on the same model with more source. The warm runs made zero requests
 to Ollama; `--timing` shows no load/prefill/decode phases. An earlier 226-file
 flask run with 3b took 30.6 s and stopped one file on the 25 s budget, which is
 why the target scenario is the 17-file source subtree.

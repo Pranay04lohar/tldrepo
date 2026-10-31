@@ -18,7 +18,7 @@ import threading
 import time
 from dataclasses import dataclass, field
 
-from .config import Config, REFERENCE_MODEL
+from .config import Config
 from .metadata import build_skeleton, estimate_tokens, neighbours_for
 from .ollama_manager import (
     ModelNotFoundError,
@@ -64,7 +64,9 @@ VAGUE_TERMS = (
 LINE = re.compile(r"^\s*(?:->\s*)?(?i:file\s+)?(\d+)\s*\|\s*(.+?)\s*$")
 FENCE = re.compile(r"^```[a-zA-Z]*\s*|\s*```$", re.MULTILINE)
 
-MAX_ESCALATIONS = 6
+MAX_SOURCE_RETRIES = 6
+RETRY_SOURCE_LINES = 80
+RETRY_SOURCE_CHARS = 2000
 GENERIC_STARTS = (
     "this file",
     "the file",
@@ -107,7 +109,7 @@ class Usage:
 class AnalysisSummary:
     described: int = 0
     failed: int = 0
-    escalated: int = 0
+    retried: int = 0
     requests: int = 0
     tokens_in: int = 0
     tokens_out: int = 0
@@ -195,8 +197,8 @@ def analyse(ctx) -> AnalysisSummary:
             progress.update(described_total)
 
     if failed and not summary.stopped and not _out_of_time(ctx):
-        summary.escalated = _escalate(ctx, manager, failed, summary)
-        described_total += summary.escalated
+        summary.retried = _retry_with_more_source(ctx, manager, failed, summary)
+        described_total += summary.retried
 
     missing = [entry for entry in entries if entry.path not in ctx.descriptions]
     rejected = {entry.path for entry in failed}
@@ -239,8 +241,14 @@ def _out_of_time(ctx) -> bool:
     return time.monotonic() >= ctx.deadline - 0.25
 
 
-def build_batches(ctx, entries) -> list[Batch]:
+def build_batches(
+    ctx,
+    entries,
+    skeleton_chars: int | None = None,
+    extra_source_lines: int = 0,
+) -> list[Batch]:
     cfg: Config = ctx.cfg
+    skeleton_chars = cfg.skeleton_max_chars if skeleton_chars is None else skeleton_chars
     groups: dict[str, list] = {}
     for entry in entries:
         groups.setdefault(entry.path.rpartition("/")[0], []).append(entry)
@@ -264,7 +272,9 @@ def build_batches(ctx, entries) -> list[Batch]:
         meta = ctx.metas[entry.path]
         neighbours = neighbours_for(entry.path, ctx.result.files)
         number = len(current) + 1
-        skeleton = build_skeleton(number, meta, neighbours, cfg.skeleton_max_chars)
+        skeleton = _skeleton_for(
+            entry, meta, neighbours, number, skeleton_chars, extra_source_lines
+        )
         block_tokens = estimate_tokens(skeleton) + 8
         if current and (
             tokens + block_tokens > cfg.batch_input_tokens
@@ -273,7 +283,9 @@ def build_batches(ctx, entries) -> list[Batch]:
             batches.append(_make_batch(current, blocks))
             current, blocks = [], []
             number = 1
-            skeleton = build_skeleton(number, meta, neighbours, cfg.skeleton_max_chars)
+            skeleton = _skeleton_for(
+                entry, meta, neighbours, number, skeleton_chars, extra_source_lines
+            )
             block_tokens = estimate_tokens(skeleton) + 8
             tokens = estimate_tokens(SYSTEM_PROMPT) + 40
         current.append(entry)
@@ -283,6 +295,28 @@ def build_batches(ctx, entries) -> list[Batch]:
     if current:
         batches.append(_make_batch(current, blocks))
     return batches
+
+
+def _skeleton_for(
+    entry,
+    meta,
+    neighbours,
+    number: int,
+    skeleton_chars: int,
+    extra_source_lines: int,
+) -> str:
+    skeleton = build_skeleton(number, meta, neighbours, skeleton_chars)
+    if extra_source_lines <= 0 or "Source:" in skeleton:
+        return skeleton
+    try:
+        text = entry.abspath.read_text("utf-8", errors="replace")
+    except OSError:
+        return skeleton
+    lines = text.splitlines()[:extra_source_lines]
+    source = "\n".join(lines)[:RETRY_SOURCE_CHARS].rstrip()
+    if not source:
+        return skeleton
+    return skeleton + "\nMore source:\n" + source
 
 
 def _make_batch(files, blocks) -> Batch:
@@ -388,28 +422,44 @@ def _commit(ctx, batch: Batch, parsed: dict[str, str], failed: list) -> int:
     return added
 
 
-def _escalate(ctx, manager, failed: list, summary: AnalysisSummary) -> int:
+def _retry_with_more_source(
+    ctx, manager, failed: list, summary: AnalysisSummary
+) -> int:
+    """One retry on the same model with a larger skeleton and real source lines.
+
+    If the retry also fails, the caller fills deterministic fallbacks. The model
+    never changes mid-run.
+    """
     cfg: Config = ctx.cfg
-    if cfg.model == REFERENCE_MODEL:
-        return 0
     candidates = [entry for entry in failed if entry.path not in ctx.descriptions][
-        :MAX_ESCALATIONS
+        :MAX_SOURCE_RETRIES
     ]
     if not candidates or _out_of_time(ctx):
         return 0
-    batch = build_batches(ctx, candidates)[0]
-    model = cfg.model
-    cfg.model = REFERENCE_MODEL
-    try:
-        parsed, usage = _describe_with_retry(manager, cfg, batch, ctx, keep_alive=0)
+    batches = build_batches(
+        ctx,
+        candidates,
+        skeleton_chars=max(2000, cfg.skeleton_max_chars * 2),
+        extra_source_lines=RETRY_SOURCE_LINES,
+    )
+    added = 0
+    for position, batch in enumerate(batches):
+        try:
+            parsed, usage = _describe_with_retry(
+                manager,
+                cfg,
+                batch,
+                ctx,
+                keep_alive=0 if position == len(batches) - 1 else cfg.keep_alive,
+            )
+        except AIStopped:
+            break
         summary.merge(usage)
-        if not parsed:
-            return 0
-        return _commit(ctx, batch, parsed, [])
-    except AIStopped:
-        return 0
-    finally:
-        cfg.model = model
+        _phase_add(ctx, "prefill", usage.prefill)
+        _phase_add(ctx, "decode", usage.decode)
+        ctx.stats.batches += 1
+        added += _commit(ctx, batch, parsed, [])
+    return added
 
 
 def _fill_fallbacks(ctx, cache_paths: set[str] | None = None) -> None:

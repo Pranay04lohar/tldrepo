@@ -18,9 +18,9 @@ and only the skeleton is sent, never full source (except very small files).
 | `explain/tiers.py` | tier assignment, deterministic/fallback descriptions, duplicates |
 | `explain/cache.py` | atomic versioned JSON cache, validation and recovery |
 | `explain/ollama_manager.py` | server ownership, readiness, load/unload, cleanup |
-| `explain/analyzer.py` | batching, prompt, parsing, quality checks, escalation, budget |
+| `explain/analyzer.py` | batching, prompt, parsing, quality checks, source retry, budget |
 | `explain/renderer.py` | compact Rich tree, footer, progress line, `--timing` |
-| `tests/` | 120 tests, including a fake Ollama HTTP server |
+| `tests/` | 121 tests, including a fake Ollama HTTP server |
 
 ## Dependencies
 
@@ -41,11 +41,12 @@ runs. Median wall seconds; full table and grading notes in `BENCHMARKS.md`.
 | `qwen2.5-coder:1.5b` | 4.94 | 73% | `--fast` |
 | `lfm3:1.7b` | 8.17 | 87% | **default** |
 | `qwen3:1.7b` | 3.38 | 7% (format failure) | rejected |
-| `qwen2.5-coder:3b` | 9.36 | 73% | reference / escalation |
+| `qwen2.5-coder:3b` | 9.36 | 73% | benchmark comparison |
 
 Default: `lfm3:1.7b`, 1.7B parameters, 1.7 GB, `nvfp4` quantisation, 262k
 context (from `ollama show`). The decision follows section 10: fastest model
-at or above 80% correct. Rejected answers escalate once to 3b.
+at or above 80% correct. Rejected answers are retried once on the same model
+with more source, never by switching models.
 
 ## Zsh integration
 
@@ -69,10 +70,10 @@ the output root was the test repo, so the working directory is preserved.
 
 ## Tests
 
-`120 passed` in 3.2 s. Coverage includes scanning/gitignore/symlinks, tree and
+`121 passed` in 3.8 s. Coverage includes scanning/gitignore/symlinks, tree and
 width truncation, AST and regex metadata, tiers and duplicates, cache
 invalidation/recovery/atomic writes, batching and `num_ctx`, parsing and every
-quality check, escalation and fallbacks, budget cut-off, real vs owned Ollama
+quality check, same-model source retry and fallbacks, budget cut-off, real vs owned Ollama
 lifecycle, `keep_alive 0`, interference cleanup, warm runs and CLI combinations.
 
 ## Measurement
@@ -82,9 +83,9 @@ of three.
 
 | Scenario | Target | Measured | scan | load | prefill | decode | cleanup | render |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Cold | < 20 s | 15.20 s | 0.00 | 0.92 | 2.31 | 8.05 | 0.02 | 0.00 |
-| Warm | < 2 s | 0.23 s | 0.00 | 0 | 0 | 0 | 0 | 0.00 |
-| Five modified | < 12 s | 4.27 s | 0.00 | 0.71 | 0.40 | 2.82 | 0.02 | 0.00 |
+| Cold | < 20 s | 10.68 s | 0.00 | 0.52 | 1.87 | 6.70 | 0.01 | 0.00 |
+| Warm | < 2 s | 0.12 s | 0.00 | 0 | 0 | 0 | 0 | 0.00 |
+| Five modified | < 12 s | 2.88 s | 0.00 | 0.51 | 0.33 | 1.84 | 0.01 | 0.00 |
 
 After every run `ollama ps` was empty. No process from our `Popen` handle
 remained. The pre-existing Ollama menu-bar app was left untouched.
@@ -94,7 +95,7 @@ remained. The pre-existing Ollama menu-bar app was left untouched.
 - lfm3 is terse but can speculate on mixed-directory batches; the spot check
   flagged 1 of 10 descriptions (“Compatibility layer for I/O streams on
   Windows” for `_compat.py`, which is broader than Windows).
-- Cold time varies with answer length (11.9 to 16.2 s on the same 17 files).
+- Cold time varies with answer length (10.6 to 11.6 s on the same 17 files).
 - A very large checkout (226 files) can exceed the default 25 s budget; files
   left pending are described by deterministic fallbacks and picked up on the
   next run.

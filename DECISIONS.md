@@ -90,20 +90,21 @@ with unrelated example templates.
 With prompt v2 and conservative grading, `lfm3:1.7b` scored 87 percent correct
 on the 15-file flask corpus at an 8.2 s median, so the section 10 rule selects
 it as the fastest model at or above 80 percent. `qwen2.5-coder:3b` (9.4 s,
-73 percent) remains the reference and escalation model, and `--fast` uses
+73 percent) is kept for benchmark comparison only; `--fast` uses
 `qwen2.5-coder:1.5b` (4.9 s, 73 percent).
 
-Real-project check: `src/click` cold runs measured 11.9 to 16.2 s (median
-15.2 s), inside the 20 s target. lfm3's decode dominates, so its advantage
+Real-project check: `src/click` cold runs measured 10.6 to 11.6 s (median
+10.7 s), inside the 20 s target. lfm3's decode dominates, so its advantage
 depends on how concisely it answers; the benchmark and the real run are both
 reported in BENCHMARKS.md.
 
-### B4. Escalation is one extra request, capped (step 10)
+### B4. Failures are retried on the same model, then fall back (step 10)
 
 Rejected lines (missing, `unclear`, vague filler, filename repetition, or
-starting with "This file"/"contains") are retried once as a group against
-`qwen2.5-coder:3b`, at most 6 files. Descriptions are cached only after they
-pass the quality checks. A failed batch never stops the run.
+starting with "This file"/"contains") are retried once as a group on the same
+model, at most 6 files, with a larger skeleton and up to 80 lines of real
+source appended. The model never changes mid-run. If the retry still fails, a
+deterministic fallback is used and cached. A failed batch never stops the run.
 
 ### B5. Unload before stopping (step 10/11)
 
