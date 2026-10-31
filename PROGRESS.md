@@ -37,4 +37,4 @@ benchmark is in BENCHMARKS.md.
   `zsh -i` verified from a `/tmp` test repo)
 - [x] Step 15: measurement protocol on `pallets/click` (`src/click`, 17 files):
   cold 15.20 s, warm 0.23 s, five modified 4.27 s; `ollama ps` empty
-- [ ] Step 16: final report
+- [x] Step 16: final report (`REPORT.md`); **Gate C passed**
