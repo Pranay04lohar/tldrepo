@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from explain.config import Config
-from explain.metadata import (
+from tldrepo.config import Config
+from tldrepo.metadata import (
     analyze,
     build_skeleton,
     estimate_tokens,
     neighbours_for,
     skeleton_summary,
 )
-from explain.scanner import ScannedFile, scan
+from tldrepo.scanner import ScannedFile, scan
 
 PY_SOURCE = '''"""Utilities for scoring job relevance."""
 

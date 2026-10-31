@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from explain.config import Config
-from explain.metadata import analyze
-from explain.scanner import scan
-from explain.tiers import (
+from tldrepo.config import Config
+from tldrepo.metadata import analyze
+from tldrepo.scanner import scan
+from tldrepo.tiers import (
     TIER_DETERMINISTIC,
     TIER_LLM,
     assign,
@@ -79,11 +79,24 @@ def test_config_and_docs_are_tier_zero(tmp_path):
         "config/app.yaml": "port: 1\n",
     }
     result, _, _ = decisions(tmp_path, files)
-    assert result["pyproject.toml"].description == "Python project metadata and dependencies"
+    assert result["pyproject.toml"].description == "Project dependencies"
     assert result["Dockerfile"].description == "Container image build definition"
     assert result["README.md"].tier == TIER_DETERMINISTIC
     assert result[".github/workflows/ci.yml"].description == "GitHub Actions CI workflow"
-    assert result["config/app.yaml"].description == "Service configuration"
+    assert result["config/app.yaml"].description == "App settings"
+
+
+def test_config_descriptions_come_from_the_filename(tmp_path):
+    files = {
+        "profile.example.yaml": "name: demo\n",
+        "mkdocs.yml": "site_name: demo\n",
+        "config/database.json": "{}\n",
+    }
+    result, _, _ = decisions(tmp_path, files)
+    assert result["profile.example.yaml"].description == "Example candidate profile settings"
+    assert result["mkdocs.yml"].description == "Mkdocs settings"
+    assert result["config/database.json"].description == "Database settings"
+    assert all("service" not in d.description.lower() for d in result.values())
 
 
 def test_trivial_init_is_a_package_marker(tmp_path):

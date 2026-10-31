@@ -4,8 +4,8 @@ import json
 import os
 from pathlib import Path
 
-from explain.cache import Cache
-from explain.config import CACHE_VERSION, PROMPT_VERSION
+from tldrepo.cache import Cache
+from tldrepo.config import CACHE_VERSION, PROMPT_VERSION
 
 DIGEST = "a" * 64
 MODEL = "qwen2.5-coder:1.5b"
@@ -13,9 +13,9 @@ MODEL = "qwen2.5-coder:1.5b"
 
 def test_cache_directory_and_gitignore_guard(tmp_path):
     cache = Cache(tmp_path).load()
-    assert (tmp_path / ".explain").is_dir()
-    assert (tmp_path / ".explain" / ".gitignore").read_text().strip() == "*"
-    assert cache.path == tmp_path / ".explain" / "cache.json"
+    assert (tmp_path / ".tldrepo").is_dir()
+    assert (tmp_path / ".tldrepo" / ".gitignore").read_text().strip() == "*"
+    assert cache.path == tmp_path / ".tldrepo" / "cache.json"
 
 
 def test_put_get_roundtrip(tmp_path):
@@ -58,7 +58,7 @@ def test_prune_removes_deleted_files(tmp_path):
 
 
 def test_malformed_cache_is_backed_up_and_reset(tmp_path):
-    directory = tmp_path / ".explain"
+    directory = tmp_path / ".tldrepo"
     directory.mkdir()
     (directory / "cache.json").write_text("{not json", "utf-8")
     cache = Cache(tmp_path).load()
@@ -69,7 +69,7 @@ def test_malformed_cache_is_backed_up_and_reset(tmp_path):
 
 
 def test_unknown_version_is_backed_up_and_reset(tmp_path):
-    directory = tmp_path / ".explain"
+    directory = tmp_path / ".tldrepo"
     directory.mkdir()
     (directory / "cache.json").write_text(
         json.dumps({"version": 999, "files": {"a.py": {}}, "dirs": {}}), "utf-8"
@@ -84,9 +84,9 @@ def test_atomic_write_leaves_no_temp_files(tmp_path):
     cache = Cache(tmp_path).load()
     cache.put_file("a.py", DIGEST, MODEL, 1, "Atomic")
     cache.save()
-    leftovers = [p.name for p in (tmp_path / ".explain").iterdir() if p.name.endswith(".tmp")]
+    leftovers = [p.name for p in (tmp_path / ".tldrepo").iterdir() if p.name.endswith(".tmp")]
     assert leftovers == []
-    payload = json.loads((tmp_path / ".explain" / "cache.json").read_text())
+    payload = json.loads((tmp_path / ".tldrepo" / "cache.json").read_text())
     assert payload["version"] == CACHE_VERSION
     assert payload["files"]["a.py"]["hash"] == DIGEST
 
@@ -95,7 +95,7 @@ def test_failed_write_keeps_previous_cache(tmp_path, monkeypatch):
     cache = Cache(tmp_path).load()
     cache.put_file("a.py", DIGEST, MODEL, 1, "Original")
     cache.save()
-    before = (tmp_path / ".explain" / "cache.json").read_text()
+    before = (tmp_path / ".tldrepo" / "cache.json").read_text()
 
     def boom(*args, **kwargs):
         raise OSError("disk full")
@@ -106,8 +106,8 @@ def test_failed_write_keeps_previous_cache(tmp_path, monkeypatch):
         cache.save()
     except OSError:
         pass
-    assert (tmp_path / ".explain" / "cache.json").read_text() == before
-    leftovers = [p for p in (tmp_path / ".explain").iterdir() if p.name.endswith(".tmp")]
+    assert (tmp_path / ".tldrepo" / "cache.json").read_text() == before
+    leftovers = [p for p in (tmp_path / ".tldrepo").iterdir() if p.name.endswith(".tmp")]
     assert leftovers == []
 
 
@@ -115,7 +115,7 @@ def test_source_code_is_never_cached(tmp_path):
     cache = Cache(tmp_path).load()
     cache.put_file("a.py", DIGEST, MODEL, 1, "Description only")
     cache.save()
-    payload = (tmp_path / ".explain" / "cache.json").read_text()
+    payload = (tmp_path / ".tldrepo" / "cache.json").read_text()
     assert "Description only" in payload
     assert set(json.loads(payload)["files"]["a.py"]) == {
         "hash",
@@ -144,8 +144,8 @@ def test_clear_keeps_cache_file_usable(tmp_path):
 
 
 def test_v2_cache_is_migrated_with_sources(tmp_path):
-    (tmp_path / ".explain").mkdir()
-    (tmp_path / ".explain" / "cache.json").write_text(
+    (tmp_path / ".tldrepo").mkdir()
+    (tmp_path / ".tldrepo" / "cache.json").write_text(
         json.dumps(
             {
                 "version": 2,

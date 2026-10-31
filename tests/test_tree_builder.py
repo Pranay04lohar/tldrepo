@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from explain.config import Config
-from explain.scanner import scan
-from explain.tree_builder import build_tree, directory_nodes, file_nodes, iter_with_depth
+from tldrepo.config import Config
+from tldrepo.scanner import scan
+from tldrepo.tree_builder import build_tree, directory_nodes, file_nodes, iter_with_depth
 
 
 def write(path: Path, text: str = "x = 1\n") -> None:

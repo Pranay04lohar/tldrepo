@@ -1,4 +1,4 @@
-"""JSON cache under ``<repo>/.explain/cache.json``.
+"""JSON cache under ``<repo>/.tldrepo/cache.json``.
 
 The cache stores descriptions, source tags and hashes, never source code.
 Writes are atomic and a malformed cache is backed up rather than trusted.
@@ -21,7 +21,7 @@ SOURCES = {"llm", "docstring", "rule", "fallback"}
 class Cache:
     def __init__(self, root: Path, version: int = CACHE_VERSION):
         self.root = Path(root)
-        self.dir = self.root / ".explain"
+        self.dir = self.root / ".tldrepo"
         self.path = self.dir / "cache.json"
         self.version = version
         self.data: dict = {"version": version, "files": {}, "dirs": {}}

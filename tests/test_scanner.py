@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from explain.config import Config
-from explain.scanner import (
+from tldrepo.config import Config
+from tldrepo.scanner import (
     ScannedFile,
     apply_rules,
     find_root,
@@ -202,7 +202,7 @@ def test_language_for(name, expected):
 def test_dot_directories_need_all_and_git_explain_stay_hidden(tmp_path):
     write(tmp_path / ".agents" / "rule.md", "x\n")
     write(tmp_path / ".git" / "config", "x\n")
-    write(tmp_path / ".explain" / "cache.json", "{}\n")
+    write(tmp_path / ".tldrepo" / "cache.json", "{}\n")
     write(tmp_path / "src" / "app.py", "x = 1\n")
     default = scan(tmp_path, cfg=Config())
     assert ".agents/rule.md" not in paths(default)
@@ -210,4 +210,4 @@ def test_dot_directories_need_all_and_git_explain_stay_hidden(tmp_path):
     shown = scan(tmp_path, cfg=Config(show_all=True))
     assert ".agents/rule.md" in paths(shown)
     assert ".git/config" not in paths(shown)
-    assert ".explain/cache.json" not in paths(shown)
+    assert ".tldrepo/cache.json" not in paths(shown)

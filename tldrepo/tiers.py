@@ -39,7 +39,7 @@ DOC_NAMES = {
 }
 
 CONFIG_DESCRIPTIONS = {
-    "pyproject.toml": "Python project metadata and dependencies",
+    "pyproject.toml": "Project dependencies",
     "setup.py": "Python package build script",
     "setup.cfg": "Python packaging configuration",
     "requirements.txt": "Python dependency list",
@@ -66,9 +66,9 @@ CONFIG_DESCRIPTIONS = {
     "jest.config.js": "Jest test-runner configuration",
     "vitest.config.ts": "Vitest test-runner configuration",
     "dockerfile": "Container image build definition",
-    "docker-compose.yml": "Multi-container service definition",
-    "docker-compose.yaml": "Multi-container service definition",
-    "compose.yml": "Multi-container service definition",
+    "docker-compose.yml": "Multi-container Docker definition",
+    "docker-compose.yaml": "Multi-container Docker definition",
+    "compose.yml": "Multi-container Docker definition",
     "makefile": "Build and task automation targets",
     ".gitignore": "Git ignore rules",
     ".dockerignore": "Docker build-context exclusions",
@@ -171,6 +171,8 @@ def is_config_path(path: str) -> bool:
         return True
     if name.startswith(("tsconfig.", "eslint", "prettier", "vite.config", "webpack.config")):
         return True
+    if Path(name).suffix in CONFIG_SUFFIXES:
+        return True
     if any(part.lower() in {"config", "configs", "conf", "settings"} for part in path.split("/")[:-1]):
         return True
     return False
@@ -237,6 +239,54 @@ def test_description(path: str, meta: FileMetadata) -> str:
     return f"Tests for {module}"
 
 
+CONFIG_SUFFIX_WORDS = {
+    ".yml": "settings",
+    ".yaml": "settings",
+    ".toml": "settings",
+    ".json": "settings",
+    ".ini": "settings",
+    ".cfg": "settings",
+    ".conf": "settings",
+    ".properties": "properties",
+    ".env": "environment variables",
+}
+
+GENERIC_STEM_WORDS = {"config", "configs", "conf", "configuration", "settings", "setting"}
+
+
+def _filename_config_description(name: str, suffix: str) -> str:
+    """Turn a config filename into a short, truthful label.
+
+    The rule never invents a domain: it uses the words that are actually in the
+    filename. ``profile.example.yaml`` becomes "Example candidate profile
+    settings" and an unknown ``mkdocs.yml`` becomes "Mkdocs settings".
+    """
+    stem = name[: -len(suffix)] if suffix else name
+    tokens = [part for part in re.split(r"[._-]+", stem) if part]
+    words = [part for part in tokens if part.lower() not in GENERIC_STEM_WORDS]
+    generic = [part for part in tokens if part.lower() in GENERIC_STEM_WORDS]
+
+    if name == "pyproject.toml":
+        return "Project dependencies"
+    if "example" in (part.lower() for part in words):
+        rest = [part for part in words if part.lower() != "example"]
+        joined = " ".join(rest)
+        if joined:
+            if joined.lower() == "profile":
+                return "Example candidate profile settings"
+            return f"Example {joined} settings"
+        return "Example settings"
+    body = " ".join(words)
+    kind = CONFIG_SUFFIX_WORDS.get(suffix, "configuration")
+    if not body:
+        return "Project configuration"
+    if kind == "settings" and generic:
+        return f"{body.title()} settings"
+    if kind == "settings":
+        return f"{body.title()} settings"
+    return f"{body.title()} {kind}"
+
+
 def config_description(path: str) -> str | None:
     parts = path.split("/")
     name = parts[-1].lower()
@@ -247,18 +297,10 @@ def config_description(path: str) -> str | None:
     if parts[0].lower() == ".github":
         return "GitHub repository configuration"
     if parts[0].lower() not in {".github", "config", "configs", "conf", ".config"}:
-        if name not in CONFIG_DESCRIPTIONS:
+        if name not in CONFIG_DESCRIPTIONS and Path(name).suffix not in CONFIG_SUFFIXES:
             return None
     suffix = Path(name).suffix.lower()
-    if suffix in {".yml", ".yaml"}:
-        return "Service configuration"
-    if suffix == ".toml":
-        return "Project configuration"
-    if suffix == ".json":
-        return "JSON configuration data"
-    if suffix in {".ini", ".cfg", ".conf"}:
-        return "Application configuration"
-    return "Project configuration"
+    return _filename_config_description(name, suffix)
 
 
 def doc_description(path: str, meta: FileMetadata) -> str:
@@ -411,6 +453,97 @@ def fallback_description(meta: FileMetadata) -> str:
 def plural(count: int, singular: str, plural_form: str | None = None) -> str:
     word = singular if count == 1 else (plural_form or singular + "s")
     return f"{count} {word}"
+
+
+# Concepts that small models frequently invent for a directory. Each entry lists
+# words that count as evidence for that concept in the children's names or
+# descriptions. A claimed concept with no evidence is rejected.
+CONCEPT_EVIDENCE = {
+    "forms": ("form", "field", "input", "validat", "schema"),
+    "api": ("api", "route", "endpoint", "handler", "controller", "request", "response"),
+    "database": (
+        "database", "db", "sql", "query", "queries", "migration", "schema",
+        "repository", "storage", "persist",
+    ),
+    "authentication": (
+        "auth", "login", "token", "session", "permission", "credential", "user",
+    ),
+    "authorization": ("auth", "permission", "role", "access"),
+    "tests": ("test", "spec", "fixture", "assert", "pytest"),
+    "ui": ("ui", "component", "view", "page", "template", "render", "style", "css"),
+    "config": ("config", "setting", "environment", "yaml", "toml", "json", "ini"),
+    "network": ("network", "http", "request", "client", "fetch", "socket", "api"),
+    "logging": ("log", "logger", "logging"),
+    "cache": ("cache", "caching", "memo"),
+    "email": ("email", "mail", "smtp", "send"),
+    "payment": ("payment", "billing", "invoice", "stripe", "checkout"),
+    "worker": ("worker", "job", "task", "queue", "scheduler", "background"),
+    "images": ("image", "avatar", "photo", "picture", "media"),
+}
+
+
+def strip_parentheticals(text: str) -> str:
+    """Remove parentheticals (including nested and unmatched ones)."""
+    value = text
+    previous = None
+    while previous != value:
+        previous = value
+        value = re.sub(r"\([^()]*\)", " ", value)
+        value = re.sub(r"\[[^\[\]]*\]", " ", value)
+    value = re.sub(r"[()\[\]{}]", " ", value)
+    return re.sub(r"\s+", " ", value).strip()
+
+
+def unsupported_concepts(description: str, children: list[str]) -> list[str]:
+    """Return concepts the description claims but the children do not support."""
+    lowered = description.lower()
+    evidence = " ".join(children).lower()
+    missing: list[str] = []
+    for concept, terms in CONCEPT_EVIDENCE.items():
+        triggers = {concept, *terms}
+        claimed = any(re.search(r"\b" + re.escape(term) + r"\w*", lowered) for term in triggers)
+        if not claimed:
+            continue
+        supported = any(term in evidence for term in terms)
+        if not supported:
+            missing.append(concept)
+    return missing
+
+
+DIRECTORY_VAGUE_TERMS = (
+    "various",
+    "utility functions",
+    "helper functions",
+    "helper methods",
+    "miscellaneous",
+    "misc",
+    "contains code",
+    "handles things",
+)
+
+
+def clean_directory_description(
+    text: str, children: list[str], max_words: int = 8
+) -> str | None:
+    """Normalise a directory label and reject invented concepts."""
+    value = strip_parentheticals(text)
+    value = value.strip().strip("\"'`").replace("`", "")
+    value = re.sub(r"^[\s>*\-•]+", "", value)
+    value = re.sub(r"\s+", " ", value)
+    value = value.rstrip(".!,;:")
+    if not value:
+        return None
+    lowered = value.lower()
+    if "unclear" in lowered or any(term in lowered for term in DIRECTORY_VAGUE_TERMS):
+        return None
+    words = value.split()
+    if len(words) > max_words:
+        value = " ".join(words[:max_words]).rstrip(".!,;:")
+    if unsupported_concepts(value, children):
+        return None
+    if len(value.split()) < 2:
+        return None
+    return value[:1].upper() + value[1:]
 
 
 def directory_key(dir_path: str, child_descriptions: list[str]) -> str:

@@ -27,6 +27,7 @@ from .ollama_manager import (
     OllamaManager,
 )
 from .tiers import (
+    clean_directory_description,
     directory_children,
     directory_description,
     directory_key,
@@ -154,7 +155,7 @@ def analyse(ctx) -> AnalysisSummary:
         except BaseException as exc:  # noqa: BLE001 - surfaced below
             load_error.append(exc)
 
-    loader = threading.Thread(target=load, name="explain-model-load", daemon=True)
+    loader = threading.Thread(target=load, name="tldrepo-model-load", daemon=True)
     load_started = time.perf_counter()
     loader.start()
 
@@ -357,8 +358,10 @@ def _parse_directory_lines(text: str, numbers: dict[str, dict], cfg: Config) -> 
         number, raw = match.group(1), match.group(2)
         if number not in numbers or number in result:
             continue
-        description = clean_description(
-            raw, cfg, path="", max_words=cfg.directory_max_words
+        candidate = numbers[number]
+        children = candidate.get("children", []) if isinstance(candidate, dict) else []
+        description = clean_directory_description(
+            raw, children, max_words=cfg.directory_max_words
         )
         if description:
             result[number] = description

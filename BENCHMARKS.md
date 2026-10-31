@@ -36,7 +36,7 @@ and `--fast` uses `qwen2.5-coder:1.5b`.
 
 ## Measurement protocol
 
-Target project: `pallets/click` cloned to `/tmp/explain-bench-click`, scan
+Target project: `pallets/click` cloned to `/tmp/tldrepo-bench-click`, scan
 target `src/click` (17 Python source files after filtering). Default model
 `lfm3:1.7b`, prompt version 2, budget 25 s.
 

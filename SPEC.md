@@ -4,11 +4,11 @@ A fast, local-AI codebase map for the terminal. This is the revised spec. It kee
 
 ## How to use this file
 
-1. Save this whole document as `~/projects/explain-cli/SPEC.md`.
+1. Save this whole document as `~/projects/tldrepo/SPEC.md`.
 2. Paste only this launch prompt into OpenCode:
 
 ```text
-Read ~/projects/explain-cli/SPEC.md completely. Follow its Working Rules, Phase Gates and Speed Rules exactly. Start at Phase A and continue through Phase C without stopping unless a gate fails or a Stop condition in the Working Rules is hit. Do not ask me questions otherwise.
+Read ~/projects/tldrepo/SPEC.md completely. Follow its Working Rules, Phase Gates and Speed Rules exactly. Start at Phase A and continue through Phase C without stopping unless a gate fails or a Stop condition in the Working Rules is hit. Do not ask me questions otherwise.
 ```
 
 ---
@@ -17,14 +17,14 @@ Read ~/projects/explain-cli/SPEC.md completely. Follow its Working Rules, Phase 
 
 Act as a senior Python engineer specialising in CLI tools, local LLM inference and performance optimisation.
 
-Build, test and install a lightweight standalone Python utility called `explain`. It shows the structure and purpose of an unfamiliar codebase from my Ghostty terminal.
+Build, test and install a lightweight standalone Python utility called `tldrepo`. It shows the structure and purpose of an unfamiliar codebase from my Ghostty terminal.
 
 ```bash
 cd ~/projects/my-project
-explain
+tldrepo
 ```
 
-Do not only plan or explain. Build it, test it, benchmark it and integrate it into my Zsh environment.
+Do not only plan or describe. Build it, test it, benchmark it and integrate it into my Zsh environment.
 
 ## Priorities, in order
 
@@ -42,14 +42,14 @@ Do not only plan or explain. Build it, test it, benchmark it and integrate it in
 - Never claim a step is done without running its tests or commands and showing the real output.
 - Do not ask me questions. Make reasonable assumptions and log them in `DECISIONS.md`.
 - **Stop and ask only for:** sudo, installing system software, or deleting anything outside the project directory.
-- Never modify source files of any repository being scanned. The only thing written inside a target repo is `.explain/`.
+- Never modify source files of any repository being scanned. The only thing written inside a target repo is `.tldrepo/`.
 - Do the `.zshrc` change last (see section 14).
 
 ---
 
 # 2. Phase Gates
 
-**Phase A: deterministic core, no LLM (steps 1 to 8)** Gate: all tests pass, and `explain --no-ai` renders a correct tree on a real repository.
+**Phase A: deterministic core, no LLM (steps 1 to 8)** Gate: all tests pass, and `tldrepo --no-ai` renders a correct tree on a real repository.
 
 **Phase B: Ollama, batching, cache, benchmark (steps 9 to 13)** Gate: mocked tests pass, one real run succeeds, `ollama ps` shows nothing loaded afterwards, and `BENCHMARKS.md` contains the model comparison.
 
@@ -112,10 +112,10 @@ Do not use Typer, Click, tree, cloc, ctags or other external utilities. The app 
 # 6. Project Structure
 
 ```text
-explain-cli/
-├── explain/
+tldrepo/
+├── tldrepo/
 │   ├── __init__.py
-│   ├── __main__.py        # enables `python -m explain`
+│   ├── __main__.py        # enables `python -m tldrepo`
 │   ├── main.py            # argparse + orchestration
 │   ├── scanner.py
 │   ├── tree_builder.py
@@ -153,15 +153,15 @@ Keep modules independent. Avoid unnecessary abstractions.
 
 ## scanner.py
 
-- **Root detection:** nearest ancestor containing `.git`, otherwise the current directory. The cache lives at `<root>/.explain/`.
-- `explain src/` limits scanning and display to that subtree. `explain src/main.py` shows one file.
+- **Root detection:** nearest ancestor containing `.git`, otherwise the current directory. The cache lives at `<root>/.tldrepo/`.
+- `tldrepo src/` limits scanning and display to that subtree. `tldrepo src/main.py` shows one file.
 - Scan recursively with configurable depth. Do not follow symlinks.
 - **Respect `.gitignore`** using a built-in matcher (no git CLI).
 - Detect binary files by a null-byte check on the first 8 KB. Skip binaries, oversized files (configurable, default 200 KB), empty files, lockfiles, generated files, images, datasets and build outputs.
 - Handle unreadable files gracefully.
-- Default ignored directories: `.git`, `.venv`, `venv`, `__pycache__`, `node_modules`, `dist`, `build`, `.next`, `.idea`, `.vscode`, `.pytest_cache`, `.mypy_cache`, `.explain`.
+- Default ignored directories: `.git`, `.venv`, `venv`, `__pycache__`, `node_modules`, `dist`, `build`, `.next`, `.idea`, `.vscode`, `.pytest_cache`, `.mypy_cache`, `.tldrepo`.
 - Exclusions are configurable.
-- On first creation of `.explain/`, write `.explain/.gitignore` containing `*` so the cache never appears in `git status`.
+- On first creation of `.tldrepo/`, write `.tldrepo/.gitignore` containing `*` so the cache never appears in `git status`.
 
 ## metadata.py
 
@@ -301,7 +301,7 @@ The model is a config value, never hard-coded in modules. Overridable with `--mo
 This is the most safety-critical part.
 
 ```text
-explain
+tldrepo
   -> cache check says work is needed?
        no  -> render immediately, never touch Ollama
        yes -> is Ollama already running?   (GET /api/version, honour OLLAMA_HOST, default http://127.0.0.1:11434)
@@ -330,7 +330,7 @@ Requirements:
 
 # 12. Cache (cache.py)
 
-Location: `<root>/.explain/cache.json`.
+Location: `<root>/.tldrepo/cache.json`.
 
 ```json
 {
@@ -365,7 +365,7 @@ Location: `<root>/.explain/cache.json`.
 - Directory-first ordering, correct ASCII connectors, configurable depth, empty directories handled.
 - Descriptions align beside names and are **truncated with an ellipsis to the terminal width**.
 - While analysing, show a single transient progress line, for example `Analysing 14 files... 6/14`. Print the final tree once.
-- Footer: files scanned, files analysed by AI, descriptions from cache, files described deterministically, files pending (if the time budget ran out, with a hint to run `explain` again), and total duration.
+- Footer: files scanned, files analysed by AI, descriptions from cache, files described deterministically, files pending (if the time budget ran out, with a hint to run `tldrepo` again), and total duration.
 - `--timing` additionally prints per-phase times (scan, load, prefill, decode, cleanup, render).
 
 Example:
@@ -387,17 +387,17 @@ my-project/
 
 | Command | Behaviour |
 | --- | --- |
-| `explain` | Analyse uncached or modified files, show the full map |
-| `explain --no-ai` | Tree from cache plus deterministic descriptions, never starts Ollama |
-| `explain --refresh` | Regenerate all eligible descriptions |
-| `explain --depth 3` | Limit depth |
-| `explain --stats` | Language and file statistics |
-| `explain src/` | Analyse and display one directory |
-| `explain src/main.py` | Show one file: description, skeleton summary |
-| `explain --model NAME` | Override the model |
-| `explain --fast` | Use the fast model |
-| `explain --budget N` | Time budget in seconds (default 25) |
-| `explain --timing` | Show per-phase timings |
+| `tldrepo` | Analyse uncached or modified files, show the full map |
+| `tldrepo --no-ai` | Tree from cache plus deterministic descriptions, never starts Ollama |
+| `tldrepo --refresh` | Regenerate all eligible descriptions |
+| `tldrepo --depth 3` | Limit depth |
+| `tldrepo --stats` | Language and file statistics |
+| `tldrepo src/` | Analyse and display one directory |
+| `tldrepo src/main.py` | Show one file: description, skeleton summary |
+| `tldrepo --model NAME` | Override the model |
+| `tldrepo --fast` | Use the fast model |
+| `tldrepo --budget N` | Time budget in seconds (default 25) |
+| `tldrepo --timing` | Show per-phase timings |
 
 Support sensible combinations. The tool analyses the current working directory, not its install directory.
 
@@ -405,27 +405,27 @@ Support sensible combinations. The tool analyses the current working directory, 
 
 # 14. Zsh Integration (do this last)
 
-The original function was broken: running `explain/main.py` as a script makes relative imports fail. Use module execution instead:
+The original function was broken: running `tldrepo/main.py` as a script makes relative imports fail. Use module execution instead:
 
 ```zsh
-explain() {
-    uv run --frozen --no-sync --project "$HOME/projects/explain-cli" \
-        python -m explain "$@"
+tldrepo() {
+    uv run --frozen --no-sync --project "$HOME/projects/tldrepo" \
+        python -m tldrepo "$@"
 }
 ```
 
-Before finishing, run `uv sync` once in the project. Also measure the alternative of calling the project's `.venv/bin/python -m explain` directly, and use whichever has lower startup time. Confirm the working directory is preserved (it must scan where I am, not the install directory).
+Before finishing, run `uv sync` once in the project. Also measure the alternative of calling the project's `.venv/bin/python -m tldrepo` directly, and use whichever has lower startup time. Confirm the working directory is preserved (it must scan where I am, not the install directory).
 
 Procedure:
 
-1. Inspect the existing `~/.zshrc`. Check whether an `explain` function or alias already exists.
+1. Inspect the existing `~/.zshrc`. Check whether a `tldrepo` function or alias already exists.
 2. Back up to `~/.zshrc.bak.<timestamp>`.
-3. Wrap the function in `# >>> explain >>>` and `# <<< explain <<<` markers. Make the edit idempotent (replace the marked block if present, never duplicate).
+3. Wrap the function in `# >>> tldrepo >>>` and `# <<< tldrepo <<<` markers. Make the edit idempotent (replace the marked block if present, never duplicate).
 4. Do not touch unrelated aliases, functions or configuration.
 5. Show the diff.
-6. Verify: `zsh -i -c 'cd /tmp/<test-repo> && explain --no-ai'`.
+6. Verify: `zsh -i -c 'cd /tmp/<test-repo> && tldrepo --no-ai'`.
 
-Adapt the path if the project is installed somewhere other than `~/projects/explain-cli`.
+Adapt the path if the project is installed somewhere other than `~/projects/tldrepo`.
 
 ---
 
@@ -463,7 +463,7 @@ Cover: recursive scanning, directory exclusions, `.gitignore` handling, hidden f
 - Report per-phase times: scan, model load, prefill, decode, cleanup, render.
 - After every run, check `ollama ps` (nothing loaded) and `pgrep -fl ollama` (no process we started).
 - Quality spot check: print 10 random descriptions beside their skeletons and flag any that look invented.
-- Report real numbers only. If a target is missed, say so and explain why.
+- Report real numbers only. If a target is missed, say so and describe why.
 
 | Scenario | Target |
 | --- | --- |
@@ -485,7 +485,7 @@ Do not build: multi-agent systems, RAG, embeddings, vector databases, MCP server
 
 # 19. Definition of Done and Final Report
 
-Done when I can open Ghostty, `cd` into any repository, type `explain`, and see a complete ASCII tree with meaningful one-line descriptions from a local LLM. Unchanged descriptions come from cache, modified files are re-analysed, the model and any Ollama we started are shut down, a second run is near-instant, and nothing depends on an AI coding assistant.
+Done when I can open Ghostty, `cd` into any repository, type `tldrepo`, and see a complete ASCII tree with meaningful one-line descriptions from a local LLM. Unchanged descriptions come from cache, modified files are re-analysed, the model and any Ollama we started are shut down, a second run is near-instant, and nothing depends on an AI coding assistant.
 
 Finish with a report containing:
 

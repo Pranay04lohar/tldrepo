@@ -5,10 +5,11 @@ from pathlib import Path
 
 from rich.console import Console
 
-from explain.config import Config
-from explain.renderer import (
+from tldrepo.config import Config
+from tldrepo.renderer import (
     ProgressLine,
     RunStats,
+    description_style,
     render_footer,
     render_stats,
     render_legend,
@@ -17,9 +18,9 @@ from explain.renderer import (
     themed_console,
     truncate,
 )
-from explain.scanner import ScannedFile, ScanResult
-from explain.tree_builder import Node, build_tree
-from explain.scanner import scan
+from tldrepo.scanner import ScannedFile, ScanResult
+from tldrepo.tree_builder import Node, build_tree
+from tldrepo.scanner import scan
 
 
 def capture(width: int = 100) -> tuple[Console, "list[str]"]:
@@ -134,7 +135,7 @@ def test_pending_files_are_reported():
     render_footer(console, RunStats(files_scanned=9, pending=4, duration=25.0))
     out = plain(console)
     assert "4 files pending" in out
-    assert "run explain again" in out
+    assert "run tldrepo again" in out
 
 
 def test_stats_table(tmp_path):
@@ -210,6 +211,51 @@ def test_no_color_environment_variable_is_respected(monkeypatch):
     console = themed_console(file=stream, force_terminal=True, width=100)
     render_tree(console, node_tree(), {"src": "Source code"})
     assert "\x1b[" not in stream.getvalue()
+
+
+def test_one_description_per_source_renders_with_expected_style(monkeypatch):
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    sources = {
+        "llm.py": "llm",
+        "docstring.py": "docstring",
+        "rule.py": "rule",
+        "fallback.py": "fallback",
+    }
+    descriptions = {
+        "llm.py": "Model-written description",
+        "docstring.py": "Docstring description",
+        "rule.py": "Rule description",
+        "fallback.py": "Fallback description",
+    }
+    root = Node(name="proj", path="", is_dir=True)
+    for name in sources:
+        root.children.append(
+            Node(
+                name=name,
+                path=name,
+                is_dir=False,
+                file=ScannedFile(name, Path("/tmp") / name, 10, "Python", name),
+            )
+        )
+    stream = io.StringIO()
+    console = themed_console(file=stream, force_terminal=True, width=100)
+    render_tree(console, root, descriptions, sources=sources)
+    out = stream.getvalue()
+    for text in descriptions.values():
+        assert text in out
+    assert description_style("llm") == "cyan"
+    assert description_style("docstring") is None
+    assert description_style("rule") is None
+    assert description_style("fallback") == "dim italic"
+    assert "\x1b[36m" in out  # cyan only for the LLM description
+    assert "\x1b[" in out
+
+
+def test_footer_counts_ai_directories():
+    console = capture()
+    render_footer(console, RunStats(files_scanned=4, dirs_by_ai=3, duration=1.0))
+    out = plain(console)
+    assert "3 dirs by AI" in out
 
 
 def test_legend_mentions_all_sources():

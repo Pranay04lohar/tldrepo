@@ -19,10 +19,10 @@ tldrepo not found
 installed on this machine. The distribution name, import package, command and
 cache directory all use `tldrepo`; the cache is `.tldrepo/`.
 
-### R2. No migration from `.explain/` (2026-11-01)
+### R2. No migration from `.tldrepo/` (2026-11-01)
 
 The product is new to other users, so there is no installed base to migrate.
-Old `.explain/` caches are simply ignored; `.tldrepo/` is created on first run
+Old `.tldrepo/` caches are simply ignored; `.tldrepo/` is created on first run
 and contains a `.gitignore` with `*`.
 
 ## Phase A
@@ -46,10 +46,9 @@ Measured on the build machine:
 
 Assumptions:
 
-- The spec lives at `/Users/pranay/Dev:AI/AI_Engineering/Projects/explain-cli/SPEC.md`
-  (the literal path `~/projects/explain-cli` in the spec does not exist). The
-  project is built in that directory, and the Zsh integration in Phase C points
-  at this real path.
+- The spec lives in the project root (`SPEC.md`). The literal path
+  `~/projects/tldrepo` in the spec did not exist on the build machine; the
+  Zsh integration in Phase C points at the actual checkout.
 - Prerequisites were installed with Homebrew after an explicit go-ahead, because
   "installing system software" is a Stop condition. No sudo was used; Homebrew
   is user-owned at `/opt/homebrew`.
@@ -64,12 +63,13 @@ dependency, pytest for tests.
 
 ### A3. Toolchain: `uv sync` works, `uv run` does not (colon in path)
 
-The project path contains `Dev:AI`. `uv sync` succeeds, but `uv run` exits with
-`error: path segment contains separator ':'` while launching the command; the
-editable install itself is fine. Verified with `uv run -v`.
+The original checkout path contained a colon. `uv sync` succeeded, but `uv run`
+exited with `error: path segment contains separator ':'` while launching the
+command; the editable install itself was fine. Verified with `uv run -v`.
 
-Decision: use the project virtualenv directly, `.venv/bin/python -m explain`,
-and `.venv/bin/python -m pytest`. This is the spec's own allowed alternative in
+Decision: use the project virtualenv directly, `.venv/bin/python -m tldrepo`,
+and `.venv/bin/python -m pytest`. The release checkout has no colon in its path,
+so `uv run` works too, but the venv form remains the supported one. This is the spec's own allowed alternative in
 section 14, is one process cheaper than `uv run`, and does not depend on
 `uv run`'s path handling. The venv is pinned to CPython 3.12.16 (the `ollama`
 Homebrew install pulled in 3.15, which uv would otherwise select).
@@ -77,7 +77,7 @@ Homebrew install pulled in 3.15, which uv would otherwise select).
 ### A4. Cache pruning only on a full-repo scan
 
 Stale entries are removed only when the scan target is the repository root. A
-subtree scan (`explain src/`) leaves entries for other directories intact, so a
+subtree scan (`tldrepo src/`) leaves entries for other directories intact, so a
 later full run still has them.
 
 ### A5. `--no-ai` never writes fallbacks into the cache
@@ -179,7 +179,7 @@ the model and prompt version, so a warm run makes no directory request.
 ### I2. Dot-directories are opt-in
 
 Directories whose name starts with `.` are skipped by default and counted as
-`hidden-dir`. `--all` shows them, but `.git` and `.explain` remain in the
+`hidden-dir`. `--all` shows them, but `.git` and `.tldrepo` remain in the
 built-in ignore set at every setting.
 
 ### I3. Colour is driven by cache `source`

@@ -4,9 +4,9 @@ import socket
 
 import pytest
 
-from explain.config import Config
-from explain import ollama_manager as om
-from explain.ollama_manager import (
+from tldrepo.config import Config
+from tldrepo import ollama_manager as om
+from tldrepo.ollama_manager import (
     ModelNotFoundError,
     OllamaError,
     OllamaManager,

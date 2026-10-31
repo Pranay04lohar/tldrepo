@@ -2,7 +2,7 @@
 
 ## What was built
 
-`explain` is a local-only codebase map for the terminal: it scans the current
+`tldrepo` is a local-only codebase map for the terminal: it scans the current
 repository, builds an ASCII tree, and puts one short description beside every
 file and directory. Deterministic Python does traversal, gitignore matching,
 language detection, hashing, AST/regex skeletons, tiering, caching, rendering
@@ -11,15 +11,15 @@ and only the skeleton is sent, never full source (except very small files).
 
 | File | Responsibility |
 | --- | --- |
-| `explain/main.py` | argparse CLI, orchestration, phases, fallbacks, directory labels |
-| `explain/scanner.py` | traversal, built-in gitignore matcher, skip rules, digests |
-| `explain/tree_builder.py` | sorted directory-first tree, depth pruning |
-| `explain/metadata.py` | Python AST + regex metadata, compact skeletons, neighbours |
-| `explain/tiers.py` | tier assignment, deterministic/fallback descriptions, duplicates |
-| `explain/cache.py` | atomic versioned JSON cache, validation and recovery |
-| `explain/ollama_manager.py` | server ownership, readiness, load/unload, cleanup |
-| `explain/analyzer.py` | batching, prompt, parsing, quality checks, source retry, budget |
-| `explain/renderer.py` | compact Rich tree, footer, progress line, `--timing` |
+| `tldrepo/main.py` | argparse CLI, orchestration, phases, fallbacks, directory labels |
+| `tldrepo/scanner.py` | traversal, built-in gitignore matcher, skip rules, digests |
+| `tldrepo/tree_builder.py` | sorted directory-first tree, depth pruning |
+| `tldrepo/metadata.py` | Python AST + regex metadata, compact skeletons, neighbours |
+| `tldrepo/tiers.py` | tier assignment, deterministic/fallback descriptions, duplicates |
+| `tldrepo/cache.py` | atomic versioned JSON cache, validation and recovery |
+| `tldrepo/ollama_manager.py` | server ownership, readiness, load/unload, cleanup |
+| `tldrepo/analyzer.py` | batching, prompt, parsing, quality checks, source retry, budget |
+| `tldrepo/renderer.py` | compact Rich tree, footer, progress line, `--timing` |
 | `tests/` | 138 tests, including a fake Ollama HTTP server |
 
 ## Dependencies
@@ -56,16 +56,16 @@ path contains `:` (uv rejects the path segment), so the function calls the
 virtualenv directly:
 
 ```diff
-+# >>> explain >>>
++# >>> tldrepo >>>
 +# Local-AI codebase map. Module execution keeps relative imports working and
 +# scans the current working directory, not this install directory.
-+explain() {
-+    "/Users/pranay/Dev:AI/AI_Engineering/Projects/explain-cli/.venv/bin/python" -m explain "$@"
++tldrepo() {
++    "/Users/pranay/Dev:AI/AI_Engineering/Projects/tldrepo/.venv/bin/python" -m tldrepo "$@"
 +}
-+# <<< explain <<<
++# <<< tldrepo <<<
 ```
 
-Verified with `zsh -i -c 'cd /tmp/explain-gate.GHCeEI && explain --no-ai'`;
+Verified with `zsh -i -c 'cd /tmp/tldrepo-gate.GHCeEI && tldrepo --no-ai'`;
 the output root was the test repo, so the working directory is preserved.
 
 ## Tests

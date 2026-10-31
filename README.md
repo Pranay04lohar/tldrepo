@@ -1,13 +1,13 @@
-# explain
+# tldrepo
 
 A fast, local-AI codebase map for the terminal.
 
 ```bash
 cd ~/my-project
-explain
+tldrepo
 ```
 
-`explain` scans the current repository, shows a compact ASCII tree, and puts one
+`tldrepo` scans the current repository, shows a compact ASCII tree, and puts one
 short description beside each file and directory. Descriptions come from a small
 local model (via Ollama) when they are worth generating, and from deterministic
 rules when Python can answer better.
@@ -15,9 +15,9 @@ rules when Python can answer better.
 ## Install
 
 ```bash
-cd /Users/pranay/Dev:AI/AI_Engineering/Projects/explain-cli
+cd /Users/pranay/Dev:AI/AI_Engineering/Projects/tldrepo
 uv sync
-.venv/bin/python -m explain --help
+.venv/bin/python -m tldrepo --help
 ```
 
 `uv run` is not used here because this checkout's path contains `:`, which uv
@@ -28,20 +28,20 @@ supported entry point and is what the Zsh function calls.
 
 | Command | Behaviour |
 | --- | --- |
-| `explain` | Analyse uncached or modified files, show the full map |
-| `explain --no-ai` | Tree from cache plus deterministic descriptions, never starts Ollama |
-| `explain --all` | Show dot-directories (`.git` and `.explain` stay hidden) |
-| `explain --refresh` | Regenerate all eligible descriptions |
-| `explain --depth 3` | Limit depth |
-| `explain --stats` | Language and file statistics |
-| `explain src/` | Analyse and display one directory |
-| `explain src/main.py` | Show one file: description and skeleton summary |
-| `explain --model NAME` | Override the model |
-| `explain --fast` | Use the fast model |
-| `explain --budget N` | Time budget in seconds (default 25) |
-| `explain --timing` | Show per-phase timings |
-| `explain --no-color` | Disable ANSI colour (also honours `NO_COLOR` and non-TTY) |
-| `explain --legend` | Show a one-line colour legend under the footer |
+| `tldrepo` | Analyse uncached or modified files, show the full map |
+| `tldrepo --no-ai` | Tree from cache plus deterministic descriptions, never starts Ollama |
+| `tldrepo --all` | Show dot-directories (`.git` and `.tldrepo` stay hidden) |
+| `tldrepo --refresh` | Regenerate all eligible descriptions |
+| `tldrepo --depth 3` | Limit depth |
+| `tldrepo --stats` | Language and file statistics |
+| `tldrepo src/` | Analyse and display one directory |
+| `tldrepo src/main.py` | Show one file: description and skeleton summary |
+| `tldrepo --model NAME` | Override the model |
+| `tldrepo --fast` | Use the fast model |
+| `tldrepo --budget N` | Time budget in seconds (default 25) |
+| `tldrepo --timing` | Show per-phase timings |
+| `tldrepo --no-color` | Disable ANSI colour (also honours `NO_COLOR` and non-TTY) |
+| `tldrepo --legend` | Show a one-line colour legend under the footer |
 
 ## Design
 
@@ -53,7 +53,7 @@ supported entry point and is what the Zsh function calls.
   `qwen2.5-coder:1.5b`. Rejected answers are retried once on the same model
   with more source, then fall back to a deterministic description.
 - Input to the model is skeleton, never full source (unless the file is tiny).
-- Cache lives in `<repo>/.explain/cache.json` and never contains source code.
+- Cache lives in `<repo>/.tldrepo/cache.json` and never contains source code.
   Each description records its source (`llm`, `docstring`, `rule`, `fallback`)
   so colour is information: LLM cyan, docstring/rule default, fallback dim
   italic, directories bold purple, connectors/footer dim, footer numbers green.

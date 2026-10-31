@@ -2,7 +2,7 @@
 
 ## Phase A: deterministic core (steps 1 to 8)
 
-Gate A: 90 tests pass; `explain --no-ai` renders this repo in 0.02 s.
+Gate A: 90 tests pass; `tldrepo --no-ai` renders this repo in 0.02 s.
 
 - [x] Step 1: environment inspected and logged in DECISIONS.md
 - [x] Step 2: project scaffolding, pyproject, git
@@ -43,7 +43,7 @@ benchmark is in BENCHMARKS.md.
 
 - [x] Directory descriptions: built-in map, one batched LLM call for all unknown
   directories, cached by children hash + model + prompt version, plural fallback
-- [x] Dot-directories hidden by default; `--all`; `.git`/`.explain` always hidden
+- [x] Dot-directories hidden by default; `--all`; `.git`/`.tldrepo` always hidden
 - [x] Cache v3 with `source` per description and v2 migration
 - [x] Source-based colour, `NO_COLOR`/non-TTY/`--no-color`, `--legend`
 - [x] Pluralisation across directory fallbacks, footer, progress and stats

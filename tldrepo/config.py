@@ -39,7 +39,7 @@ IGNORED_DIRS = frozenset(
         ".ruff_cache",
         ".tox",
         ".eggs",
-        ".explain",
+        ".tldrepo",
         "coverage",
         "htmlcov",
         "site-packages",
@@ -48,7 +48,7 @@ IGNORED_DIRS = frozenset(
     }
 )
 
-EXCLUDED_PATH_CONFIG = ".explain/config.json"
+EXCLUDED_PATH_CONFIG = ".tldrepo/config.json"
 
 
 @dataclass
@@ -102,7 +102,7 @@ class Config:
 
 
 def load_project_config(root: Path) -> dict:
-    """Optional per-project overrides from ``.explain/config.json``."""
+    """Optional per-project overrides from ``.tldrepo/config.json``."""
     path = root / EXCLUDED_PATH_CONFIG
     try:
         raw = json.loads(path.read_text("utf-8"))

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from explain.main import build_parser, run
+from tldrepo.main import build_parser, run
 
 PY = '''"""Scores job relevance against a posting."""
 
@@ -45,7 +45,7 @@ def test_no_ai_renders_tree_and_exits_zero(repo, capsys):
 
 
 def test_no_ai_never_touches_ollama(repo, monkeypatch, capsys):
-    import explain.main as main_module
+    import tldrepo.main as main_module
 
     def explode(*args, **kwargs):
         raise AssertionError("AI analysis must not run with --no-ai")
@@ -59,7 +59,7 @@ def test_deterministic_and_fallback_descriptions_appear(repo, capsys):
     run(["--no-ai"])
     out = capsys.readouterr().out
     assert "Tests for relevance (1 tests)" in out or "Tests for relevance" in out
-    assert "Python project metadata and dependencies" in out
+    assert "Project dependencies" in out
     assert "Python module: main" in out or "Python module" in out
 
 
@@ -102,9 +102,9 @@ def test_missing_path_returns_usage_error(repo, capsys):
 def test_cache_is_written_and_reused(repo, capsys):
     run(["--no-ai"])
     capsys.readouterr()
-    cache_path = repo / ".explain" / "cache.json"
+    cache_path = repo / ".tldrepo" / "cache.json"
     assert cache_path.exists()
-    assert (repo / ".explain" / ".gitignore").read_text().strip() == "*"
+    assert (repo / ".tldrepo" / ".gitignore").read_text().strip() == "*"
     payload = json.loads(cache_path.read_text())
     assert payload["version"] == 3
     assert "tests/test_relevance.py" in payload["files"]
@@ -118,15 +118,15 @@ def test_cache_is_written_and_reused(repo, capsys):
 def test_refresh_regenerates(repo, capsys):
     run(["--no-ai"])
     capsys.readouterr()
-    before = json.loads((repo / ".explain" / "cache.json").read_text())
+    before = json.loads((repo / ".tldrepo" / "cache.json").read_text())
     run(["--no-ai", "--refresh"])
     capsys.readouterr()
-    after = json.loads((repo / ".explain" / "cache.json").read_text())
+    after = json.loads((repo / ".tldrepo" / "cache.json").read_text())
     assert after["files"].keys() == before["files"].keys()
 
 
 def test_budget_zero_disables_ai(repo, monkeypatch, capsys):
-    import explain.main as main_module
+    import tldrepo.main as main_module
 
     monkeypatch.setattr(main_module, "_analyse", lambda ctx: pytest.fail("AI should be skipped"))
     assert run(["--budget", "0"]) == 0

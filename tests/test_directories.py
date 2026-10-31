@@ -6,15 +6,15 @@ from pathlib import Path
 import pytest
 from rich.console import Console
 
-from explain import analyzer
-from explain.cache import Cache
-from explain.config import Config
-from explain.main import RunContext, _resolve_known, run
-from explain.metadata import analyze
-from explain.renderer import RunStats, themed_console
-from explain.scanner import scan
-from explain.tiers import assign, directory_key
-from explain.tree_builder import build_tree
+from tldrepo import analyzer
+from tldrepo.cache import Cache
+from tldrepo.config import Config
+from tldrepo.main import RunContext, _resolve_known, run
+from tldrepo.metadata import analyze
+from tldrepo.renderer import RunStats, themed_console
+from tldrepo.scanner import scan
+from tldrepo.tiers import assign, directory_key
+from tldrepo.tree_builder import build_tree
 
 from fake_ollama import FakeOllama
 
@@ -54,7 +54,7 @@ def fake(monkeypatch):
     server = FakeOllama().start()
     monkeypatch.setenv("OLLAMA_HOST", server.host)
     yield server
-    from explain.ollama_manager import cleanup_registered
+    from tldrepo.ollama_manager import cleanup_registered
 
     cleanup_registered()
     server.stop()
@@ -83,7 +83,7 @@ def test_all_unknown_directories_use_one_request(fake, tmp_path):
     assert ctx.description_sources["alpha"] == "llm"
     assert summary.requests >= 2
     ctx.cache.save()
-    payload = __import__("json").loads((tmp_path / ".explain" / "cache.json").read_text())
+    payload = __import__("json").loads((tmp_path / ".tldrepo" / "cache.json").read_text())
     assert payload["dirs"]
     assert {entry["source"] for entry in payload["dirs"].values()} == {"llm"}
     assert {entry["model"] for entry in payload["dirs"].values()} == {ctx.cfg.model}
@@ -134,10 +134,13 @@ def test_directory_fallbacks_are_pluralised(tmp_path, monkeypatch, capsys):
 
 
 def test_directory_descriptions_use_eight_word_limit_and_quality_checks():
-    from explain.analyzer import _parse_directory_lines
+    from tldrepo.analyzer import _parse_directory_lines
 
     cfg = Config()
-    numbers = {"1": {}, "2": {}}
+    numbers = {
+        "1": {"children": ["Loads values"]},
+        "2": {"children": ["Loads configuration values"]},
+    }
     parsed = _parse_directory_lines(
         "1|Various helper functions\n"
         "2|Loads configuration values for every single service in the whole system",
@@ -147,3 +150,33 @@ def test_directory_descriptions_use_eight_word_limit_and_quality_checks():
     assert "1" not in parsed
     assert parsed["2"] == "Loads configuration values for every single service in"
     assert len(parsed["2"].split()) == 8
+
+
+def test_directory_descriptions_strip_parentheticals_and_invented_concepts():
+    from tldrepo.analyzer import _parse_directory_lines
+
+    cfg = Config()
+    numbers = {
+        "1": {"children": ["Loads values"]},
+        "2": {"children": ["Builds invoices", "Totals line items"]},
+        "3": {"children": ["Loads values"]},
+    }
+    parsed = _parse_directory_lines(
+        "1|Loads values (temporary cache helper)\n"
+        "2|Invoice construction and total calculation\n"
+        "3|Handles user forms",
+        numbers,
+        cfg,
+    )
+    assert parsed["1"] == "Loads values"
+    assert parsed["2"] == "Invoice construction and total calculation"
+    assert "3" not in parsed
+
+
+def test_builtin_and_fallback_directory_descriptions_have_no_parentheticals():
+    from tldrepo.tiers import DIRECTORY_NAMES, strip_parentheticals
+
+    for description in DIRECTORY_NAMES.values():
+        assert strip_parentheticals(description) == description
+        assert len(description.split()) <= 8
+        assert not description.endswith("(")

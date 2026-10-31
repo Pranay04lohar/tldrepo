@@ -47,13 +47,13 @@ from .tree_builder import build_tree, directory_nodes
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="explain",
+        prog="tldrepo",
         description="A fast, local-AI codebase map for the terminal.",
     )
     parser.add_argument("path", nargs="?", default=None, help="file or directory to describe")
     parser.add_argument("--no-ai", action="store_true", help="never start or contact Ollama")
     parser.add_argument(
-        "--all", action="store_true", help="show dot-directories too (except .git and .explain)"
+        "--all", action="store_true", help="show dot-directories too (except .git and .tldrepo)"
     )
     parser.add_argument("--refresh", action="store_true", help="regenerate all descriptions")
     parser.add_argument("--depth", type=int, default=None, help="limit the displayed tree depth")
@@ -123,7 +123,7 @@ def run(argv: list[str] | None = None) -> int:
     cwd = Path.cwd()
     target = _resolve_target(cwd, args.path)
     if not target.exists():
-        print(f"explain: no such file or directory: {args.path}", file=sys.stderr)
+        print(f"tldrepo: no such file or directory: {args.path}", file=sys.stderr)
         return 2
 
     root = _root_for(cwd, target)
@@ -199,6 +199,11 @@ def run(argv: list[str] | None = None) -> int:
     else:
         _fill_with_fallbacks(ctx)
     _resolve_directories(ctx)
+    stats.dirs_by_ai = sum(
+        1
+        for node in directory_nodes(tree)
+        if ctx.description_sources.get(node.path) == "llm"
+    )
 
     render_started = time.perf_counter()
     if cfg.stats:

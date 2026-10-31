@@ -23,6 +23,7 @@ from .tree_builder import Node
 class RunStats:
     files_scanned: int = 0
     analysed_by_ai: int = 0
+    dirs_by_ai: int = 0
     from_cache: int = 0
     deterministic: int = 0
     pending: int = 0
@@ -163,6 +164,12 @@ def render_footer(console: Console, stats: RunStats) -> None:
         stats.analysed_by_ai,
         ("file" if stats.analysed_by_ai == 1 else "files") + " by AI",
     )
+    if stats.dirs_by_ai:
+        _stat(
+            parts,
+            stats.dirs_by_ai,
+            ("dir" if stats.dirs_by_ai == 1 else "dirs") + " by AI",
+        )
     _stat(
         parts,
         stats.from_cache,
@@ -183,7 +190,7 @@ def render_footer(console: Console, stats: RunStats) -> None:
         _stat(
             parts,
             stats.pending,
-            ("file" if stats.pending == 1 else "files") + " pending \u2014 run explain again",
+            ("file" if stats.pending == 1 else "files") + " pending \u2014 run tldrepo again",
         )
     if parts:
         parts.append(Text("  "))

@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 from rich.console import Console
 
-from explain import analyzer
-from explain.analyzer import (
+from tldrepo import analyzer
+from tldrepo.analyzer import (
     AIStopped,
     _describe_with_retry,
     build_batches,
@@ -16,14 +16,14 @@ from explain.analyzer import (
     clean_path,
     parse_descriptions,
 )
-from explain.cache import Cache
-from explain.config import Config
-from explain.main import RunContext, _resolve_known
-from explain.metadata import analyze
-from explain.scanner import scan
-from explain.tiers import assign
-from explain.tree_builder import build_tree
-from explain.renderer import RunStats, themed_console
+from tldrepo.cache import Cache
+from tldrepo.config import Config
+from tldrepo.main import RunContext, _resolve_known
+from tldrepo.metadata import analyze
+from tldrepo.scanner import scan
+from tldrepo.tiers import assign
+from tldrepo.tree_builder import build_tree
+from tldrepo.renderer import RunStats, themed_console
 
 from fake_ollama import FakeOllama
 
@@ -68,7 +68,7 @@ def fake(monkeypatch):
     server = FakeOllama().start()
     monkeypatch.setenv("OLLAMA_HOST", server.host)
     yield server
-    from explain.ollama_manager import cleanup_registered
+    from tldrepo.ollama_manager import cleanup_registered
 
     cleanup_registered()
     server.stop()
@@ -251,7 +251,7 @@ def test_model_not_found_is_reported_without_crash(fake, repo):
 
 
 def _batch(paths):
-    from explain.analyzer import Batch
+    from tldrepo.analyzer import Batch
 
     return Batch(
         files=[object() for _ in paths],
