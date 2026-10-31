@@ -7,7 +7,7 @@
 - [x] Step 3: scanner with .gitignore support
 - [x] Step 4: tree builder and renderer skeleton
 - [x] Step 5: metadata and skeleton extraction (49 tests green)
-- [ ] Step 6: tiering and deterministic descriptions
+- [x] Step 6: tiering and deterministic descriptions
 - [ ] Step 7: cache
 - [ ] Step 8: CLI wiring; Gate A
 
