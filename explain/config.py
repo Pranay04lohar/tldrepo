@@ -6,7 +6,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-DEFAULT_MODEL = "qwen2.5-coder:1.5b"
+DEFAULT_MODEL = "qwen2.5-coder:3b"
 FAST_MODEL = "qwen2.5-coder:1.5b"
 REFERENCE_MODEL = "qwen2.5-coder:3b"
 
