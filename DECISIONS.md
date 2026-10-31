@@ -25,6 +25,21 @@ The product is new to other users, so there is no installed base to migrate.
 Caches from the pre-release prototype are simply ignored; `.tldrepo/` is
 created on first run and contains a `.gitignore` with `*`.
 
+### R5. Release benchmark did not regress (2026-11-01)
+
+Re-ran the `pallets/click` `src/click` protocol (17 files, default model,
+median of three) after the release changes: cold 10.37 s, warm 0.10 s, five
+modified 2.46 s. The previous values were 11.66 s, 0.12 s and 3.04 s. All
+targets still pass and `ollama ps` was empty afterwards.
+
+### R4. Zsh integration uses the project venv directly (2026-11-01)
+
+`~/.zshrc` now contains one marked `# >>> tldrepo >>>` block. The `tldrepo`
+function calls this checkout's `.venv/bin/python -m tldrepo`, which preserves
+the working directory, and `explain` is kept as a personal alias to `tldrepo`.
+The old marked block was replaced rather than duplicated; the backup is
+`~/.zshrc.bak.20261101-010425`.
+
 ### R3. Packaging metadata (2026-11-01)
 
 Authors are taken from `git config user.name` and `git config user.email`

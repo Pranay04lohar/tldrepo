@@ -54,6 +54,20 @@ directory descriptions, dot-directory filtering, pluralisation and source-based
 colour were added. The `src/click` target has no unknown subdirectories, so its
 numbers contain no directory LLM call.
 
+### Release re-measurement for 0.1.0 (2026-11-01)
+
+Same hardware, target and protocol as above, re-run after the release work
+(rename, output polish, doctor and packaging). Three runs per scenario, median:
+
+| Scenario | Measured | Previous | Per-phase (scan / load / prefill / decode / cleanup / render) |
+| --- | --- | --- | --- |
+| Cold, 17 files | **10.37 s** | 11.66 s | 0.00 / 0.52 / 1.86 / 6.40 / 0.01 / 0.01 |
+| Warm, nothing changed | **0.10 s** | 0.12 s | 0.00 / 0 / 0 / 0 / 0 / 0.00 |
+| Five modified files | **2.46 s** | 3.04 s | 0.00 / 0.52 / 0.34 / 1.40 / 0.01 / 0.00 |
+
+All three scenarios improved or stayed effectively flat; none regressed.
+`ollama ps` was empty after the runs, and no server started by the tool remained.
+
 ### Directory-call cost
 
 Measured separately on the full 157-file click checkout (17 unknown

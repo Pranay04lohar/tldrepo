@@ -1,4 +1,4 @@
-# EXPLAIN: OpenCode Build Spec (v2)
+# tldrepo: OpenCode Build Spec (v2)
 
 A fast, local-AI codebase map for the terminal. This is the revised spec. It keeps the original design and adds speed rules, a model benchmark, safety rules and phase gates.
 

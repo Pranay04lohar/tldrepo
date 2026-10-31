@@ -114,12 +114,12 @@ three runs.
 
 | Scenario | Measured |
 | --- | --- |
-| Cold (no cache) | **11.66 s** |
-| Warm (nothing changed) | **0.12 s** |
-| Five files modified | **3.04 s** |
+| Cold (no cache) | **10.37 s** |
+| Warm (nothing changed) | **0.10 s** |
+| Five files modified | **2.46 s** |
 | Model resident after exit | **zero** (`ollama ps` empty) |
 
-Cold time varies with answer length (11.0 to 12.2 s on the same 17 files). On a
+Cold time varies with answer length (10.1 to 10.7 s on the same 17 files). On a
 full 157-file checkout with 17 unknown directories, one batched directory
 request added 5.09 s on an otherwise warm run; it is cached immediately, and
 the next run returns to about 0.17 s. Full tables and the model comparison are

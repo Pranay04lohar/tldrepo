@@ -13,6 +13,14 @@
       privacy test that only allows `OLLAMA_HOST` network traffic
 - [x] README product page with measured performance, models, privacy, limits
 - [x] CI matrix: Ubuntu and macOS, Python 3.11 to 3.13, via uv
+- [x] Wheel verified from a clean venv in a fresh `pallets/click` clone:
+      `--no-ai`, AI run (32 files and 15 dirs by AI) and `--help`; `ollama ps` empty
+- [x] Zsh integration: marked `tldrepo` block, `explain` alias, backup and diff,
+      verified from `/tmp` with `zsh -i`
+- [x] Release benchmark on `src/click`: cold 10.37 s, warm 0.10 s, five modified
+      2.46 s (previous 11.66 / 0.12 / 3.04); no regression, `ollama ps` empty
+- [x] Full suite: 149 passed; release report written; local tag `v0.1.0` created
+      (not pushed)
 
 ## Phase A: deterministic core (steps 1 to 8)
 
