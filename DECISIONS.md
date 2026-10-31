@@ -2,6 +2,29 @@
 
 Running log of assumptions and choices. Newest entries at the top of each phase.
 
+## Release preparation
+
+### R1. Name availability: `tldrepo` is free (2026-11-01)
+
+Checked before renaming:
+
+```text
+$ curl -s -o /dev/null -w "%{http_code}" https://pypi.org/pypi/tldrepo/json
+404
+$ which tldrepo
+tldrepo not found
+```
+
+`404` means the PyPI project name is available, and no `tldrepo` command is
+installed on this machine. The distribution name, import package, command and
+cache directory all use `tldrepo`; the cache is `.tldrepo/`.
+
+### R2. No migration from `.explain/` (2026-11-01)
+
+The product is new to other users, so there is no installed base to migrate.
+Old `.explain/` caches are simply ignored; `.tldrepo/` is created on first run
+and contains a `.gitignore` with `*`.
+
 ## Phase A
 
 ### A1. Environment (step 1)
