@@ -29,6 +29,7 @@ class RunStats:
     batch_failures: int = 0
     fallbacks: int = 0
     duration: float = 0.0
+    model: str = ""
     phases: dict[str, float] = field(default_factory=dict)
 
 

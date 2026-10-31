@@ -283,6 +283,16 @@ def _describe_directories_deterministic(ctx: RunContext) -> None:
             cached = ctx.cache.get_dir(directory_key(node.path, children))
             if cached:
                 known[node.path] = cached
+                continue
+        if node.path:
+            files = sum(1 for child in node.walk() if not child.is_dir)
+            subdirs = sum(1 for child in node.walk() if child.is_dir and child is not node)
+            if files == 0 and subdirs == 0:
+                known[node.path] = "Empty directory"
+            elif subdirs:
+                known[node.path] = f"Contains {files} files and {subdirs} subdirectories"
+            else:
+                known[node.path] = f"Contains {files} files"
 
 
 def _analyse(ctx: RunContext) -> None:
