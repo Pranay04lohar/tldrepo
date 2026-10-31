@@ -8,7 +8,7 @@
 - [x] Step 4: tree builder and renderer skeleton
 - [x] Step 5: metadata and skeleton extraction (49 tests green)
 - [x] Step 6: tiering and deterministic descriptions
-- [ ] Step 7: cache
+- [x] Step 7: cache
 - [ ] Step 8: CLI wiring; Gate A
 
 ## Phase B: Ollama, batching, cache, benchmark (steps 9 to 13)
