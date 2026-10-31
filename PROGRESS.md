@@ -11,6 +11,8 @@
 - [x] Packaging: hatchling metadata, entry point, LICENSE, CHANGELOG, CONTRIBUTING
 - [x] First-run experience: friendly Ollama/model messages, `--doctor`, and a
       privacy test that only allows `OLLAMA_HOST` network traffic
+- [x] README product page with measured performance, models, privacy, limits
+- [x] CI matrix: Ubuntu and macOS, Python 3.11 to 3.13, via uv
 
 ## Phase A: deterministic core (steps 1 to 8)
 
