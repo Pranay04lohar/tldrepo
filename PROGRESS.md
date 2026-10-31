@@ -9,6 +9,8 @@
 - [x] Rename: package/command/module `tldrepo`, cache `.tldrepo/`, README/SPEC/tests
 - [x] Personal paths removed from the repository
 - [x] Packaging: hatchling metadata, entry point, LICENSE, CHANGELOG, CONTRIBUTING
+- [x] First-run experience: friendly Ollama/model messages, `--doctor`, and a
+      privacy test that only allows `OLLAMA_HOST` network traffic
 
 ## Phase A: deterministic core (steps 1 to 8)
 

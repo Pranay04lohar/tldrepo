@@ -129,6 +129,24 @@ class AnalysisSummary:
         self.tokens_out += usage.tokens_out
 
 
+def _ai_unavailable_message(cfg: Config, exc: BaseException) -> str:
+    """One friendly block instead of a stack trace for first-run failures."""
+    model = getattr(exc, "model", cfg.model)
+    text = str(exc)
+    if isinstance(exc, ModelNotFoundError) or "not installed" in text.lower():
+        return (
+            f"AI unavailable: the model {model} is not installed.\n"
+            f"  Pull it with:  ollama pull {model}\n"
+            "  Or run: tldrepo --no-ai"
+        )
+    return (
+        "AI unavailable: Ollama is not installed or could not be started.\n"
+        f"  Details: {text}\n"
+        "  Install it from https://ollama.com/download and start it with: ollama serve\n"
+        "  tldrepo --no-ai works without Ollama."
+    )
+
+
 def analyse(ctx) -> AnalysisSummary:
     cfg: Config = ctx.cfg
     entries = [entry for entry in ctx.pending if entry.path not in ctx.descriptions]
@@ -143,7 +161,7 @@ def analyse(ctx) -> AnalysisSummary:
     try:
         manager.ensure_running()
     except OllamaError as exc:
-        ctx.console.print(f"AI unavailable: {exc}", style="warn")
+        ctx.console.print(_ai_unavailable_message(cfg, exc), style="warn")
         _fill_fallbacks(ctx)
         return summary
 
@@ -170,7 +188,7 @@ def analyse(ctx) -> AnalysisSummary:
     loader.join()
     _phase(ctx, "load", load_started)
     if load_error:
-        ctx.console.print(f"AI unavailable: {load_error[0]}", style="warn")
+        ctx.console.print(_ai_unavailable_message(cfg, load_error[0]), style="warn")
         _fill_fallbacks(ctx)
         return summary
 

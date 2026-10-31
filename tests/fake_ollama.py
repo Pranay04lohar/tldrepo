@@ -38,6 +38,7 @@ class FakeOllama:
         self.version = version
         self.requests: list[dict] = []
         self.resident: list[str] = []
+        self.installed: list[str] = []
         self.missing: set[str] = set()
         self.fail_chat = False
         self.chat_delay = 0.0
@@ -82,6 +83,11 @@ class FakeOllama:
                                 for name in fake.resident
                             ]
                         },
+                    )
+                elif self.path == "/api/tags":
+                    self._send(
+                        200,
+                        {"models": [{"name": name} for name in fake.installed]},
                     )
                 else:
                     self._send(404, {"error": "unknown path"})

@@ -68,6 +68,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--timing", action="store_true", help="show per-phase timings")
     parser.add_argument("--no-color", action="store_true", help="disable ANSI colour")
     parser.add_argument("--legend", action="store_true", help="show a colour legend below the footer")
+    parser.add_argument(
+        "--doctor",
+        action="store_true",
+        help="check Python, Ollama and the default model, then exit",
+    )
     return parser
 
 
@@ -144,6 +149,11 @@ def run(argv: list[str] | None = None) -> int:
     cfg.budget = max(0.0, float(args.budget))
     if cfg.budget == 0:
         cfg.no_ai = True
+
+    if args.doctor:
+        from .doctor import run_doctor
+
+        return run_doctor(cfg)
 
     console = themed_console(no_color=cfg.no_color)
     stats = RunStats()

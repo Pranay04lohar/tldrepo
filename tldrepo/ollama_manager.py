@@ -269,6 +269,21 @@ class OllamaManager:
         self.last_model = model
         return response
 
+    def models(self) -> list[str]:
+        """Names installed on the server (empty when it is unreachable)."""
+        try:
+            payload = self._request("GET", "/api/tags", timeout=min(5.0, self.cfg.request_timeout))
+        except OllamaError:
+            return []
+        models = payload.get("models") or []
+        names: list[str] = []
+        for item in models:
+            if isinstance(item, dict):
+                name = item.get("name") or item.get("model")
+                if name:
+                    names.append(str(name))
+        return names
+
     def ps(self) -> list[ModelInfo]:
         try:
             payload = self._request("GET", "/api/ps", timeout=min(5.0, self.cfg.request_timeout))
