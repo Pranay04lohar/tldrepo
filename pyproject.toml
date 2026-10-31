@@ -5,13 +5,46 @@ build-backend = "hatchling.build"
 [project]
 name = "tldrepo"
 version = "0.1.0"
-description = "A fast, local-AI codebase map for the terminal"
+description = "TL;DR for any codebase. Local AI, seconds, nothing left running."
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Pranay04lohar", email = "codepranay10@gmail.com" },
+]
+keywords = [
+    "codebase",
+    "code-map",
+    "local-ai",
+    "ollama",
+    "cli",
+    "developer-tools",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Documentation",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Terminals",
+]
 requires-python = ">=3.11"
-license = { text = "MIT" }
 dependencies = [
     "rich>=13.7",
 ]
+
+[project.urls]
+Homepage = "https://github.com/your-username/tldrepo"
+Repository = "https://github.com/your-username/tldrepo"
+Issues = "https://github.com/your-username/tldrepo/issues"
+Changelog = "https://github.com/your-username/tldrepo/blob/main/CHANGELOG.md"
 
 [project.scripts]
 tldrepo = "tldrepo.main:main"
@@ -23,6 +56,29 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["tldrepo"]
+exclude = [
+    "tests",
+    "tests/**",
+    "**/__pycache__",
+    "**/*.pyc",
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "tldrepo",
+    "tests",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "pyproject.toml",
+]
+exclude = [
+    ".venv",
+    ".bench",
+    ".tldrepo",
+    "**/__pycache__",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

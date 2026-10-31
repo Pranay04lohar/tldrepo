@@ -1,5 +1,15 @@
 # PROGRESS
 
+## Release preparation (2026-11-01)
+
+- [x] Name availability: PyPI `tldrepo` returned 404; no `tldrepo` command installed
+- [x] Output polish: directory labels strip parentheticals and invented concepts,
+      config labels are filename-derived, footer counts AI directories, and a
+      source-style test covers llm/docstring/rule/fallback
+- [x] Rename: package/command/module `tldrepo`, cache `.tldrepo/`, README/SPEC/tests
+- [x] Personal paths removed from the repository
+- [x] Packaging: hatchling metadata, entry point, LICENSE, CHANGELOG, CONTRIBUTING
+
 ## Phase A: deterministic core (steps 1 to 8)
 
 Gate A: 90 tests pass; `tldrepo --no-ai` renders this repo in 0.02 s.

@@ -19,11 +19,20 @@ tldrepo not found
 installed on this machine. The distribution name, import package, command and
 cache directory all use `tldrepo`; the cache is `.tldrepo/`.
 
-### R2. No migration from `.tldrepo/` (2026-11-01)
+### R2. No cache migration (2026-11-01)
 
 The product is new to other users, so there is no installed base to migrate.
-Old `.tldrepo/` caches are simply ignored; `.tldrepo/` is created on first run
-and contains a `.gitignore` with `*`.
+Caches from the pre-release prototype are simply ignored; `.tldrepo/` is
+created on first run and contains a `.gitignore` with `*`.
+
+### R3. Packaging metadata (2026-11-01)
+
+Authors are taken from `git config user.name` and `git config user.email`
+(`Pranay04lohar`, `codepranay10@gmail.com`). The configured email was wrapped
+in typographic quotes; those were stripped so the metadata contains a valid
+address. Project URLs use `your-username` placeholders until the repository is
+published. The wheel ships only the `tldrepo` package; tests and development
+files are excluded.
 
 ## Phase A
 
