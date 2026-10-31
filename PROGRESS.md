@@ -3,10 +3,10 @@
 ## Phase A: deterministic core (steps 1 to 8)
 
 - [x] Step 1: environment inspected and logged in DECISIONS.md
-- [ ] Step 2: project scaffolding, pyproject, git
-- [ ] Step 3: scanner with .gitignore support
-- [ ] Step 4: tree builder and renderer skeleton
-- [ ] Step 5: metadata and skeleton extraction
+- [x] Step 2: project scaffolding, pyproject, git
+- [x] Step 3: scanner with .gitignore support
+- [x] Step 4: tree builder and renderer skeleton
+- [x] Step 5: metadata and skeleton extraction (49 tests green)
 - [ ] Step 6: tiering and deterministic descriptions
 - [ ] Step 7: cache
 - [ ] Step 8: CLI wiring; Gate A
