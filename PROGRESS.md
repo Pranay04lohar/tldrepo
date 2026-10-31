@@ -38,3 +38,13 @@ benchmark is in BENCHMARKS.md.
 - [x] Step 15: measurement protocol on `pallets/click` (`src/click`, 17 files):
   cold 10.68 s, warm 0.12 s, five modified 2.88 s; `ollama ps` empty
 - [x] Step 16: final report (`REPORT.md`); **Gate C passed**
+
+## Post-Gate C improvements
+
+- [x] Directory descriptions: built-in map, one batched LLM call for all unknown
+  directories, cached by children hash + model + prompt version, plural fallback
+- [x] Dot-directories hidden by default; `--all`; `.git`/`.explain` always hidden
+- [x] Cache v3 with `source` per description and v2 migration
+- [x] Source-based colour, `NO_COLOR`/non-TTY/`--no-color`, `--legend`
+- [x] Pluralisation across directory fallbacks, footer, progress and stats
+- [x] 138 tests; benchmark re-run (cold 11.66 s, warm 0.12 s)

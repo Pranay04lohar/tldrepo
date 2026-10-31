@@ -123,6 +123,7 @@ def test_source_code_is_never_cached(tmp_path):
         "prompt_version",
         "tier",
         "description",
+        "source",
     }
 
 
@@ -140,3 +141,40 @@ def test_clear_keeps_cache_file_usable(tmp_path):
     cache.clear()
     cache.save()
     assert Cache(tmp_path).load().data["files"] == {}
+
+
+def test_v2_cache_is_migrated_with_sources(tmp_path):
+    (tmp_path / ".explain").mkdir()
+    (tmp_path / ".explain" / "cache.json").write_text(
+        json.dumps(
+            {
+                "version": 2,
+                "files": {
+                    "src/a.py": {
+                        "hash": DIGEST,
+                        "model": MODEL,
+                        "prompt_version": PROMPT_VERSION,
+                        "tier": 1,
+                        "description": "AI description",
+                    },
+                    "tests/test_a.py": {
+                        "hash": DIGEST,
+                        "model": MODEL,
+                        "prompt_version": PROMPT_VERSION,
+                        "tier": 0,
+                        "description": "Tests for a",
+                    },
+                },
+                "dirs": {"oldkey": "Old directory description"},
+            }
+        )
+    )
+    cache = Cache(tmp_path).load()
+    assert cache.data["version"] == CACHE_VERSION
+    assert cache.get_file("src/a.py", DIGEST, MODEL) == "AI description"
+    assert cache.get_file_source("src/a.py", DIGEST, MODEL) == "llm"
+    assert cache.get_file_source("tests/test_a.py", DIGEST, MODEL) == "rule"
+    assert cache.get_dir("oldkey") == "Old directory description"
+    assert cache.get_dir_source("oldkey") == "rule"
+    assert cache.dirty is True
+    assert not cache.recovered

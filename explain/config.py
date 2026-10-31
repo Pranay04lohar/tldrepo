@@ -10,7 +10,7 @@ DEFAULT_MODEL = "lfm3:1.7b"
 FAST_MODEL = "qwen2.5-coder:1.5b"
 
 PROMPT_VERSION = 2
-CACHE_VERSION = 2
+CACHE_VERSION = 3
 
 OLLAMA_DEFAULT_HOST = "http://127.0.0.1:11434"
 
@@ -60,11 +60,13 @@ class Config:
     ignored_suffixes: frozenset[str] = frozenset()
     use_docstrings: bool = True
     follow_symlinks: bool = False
+    show_all: bool = False
 
     # description quality
     max_description_words: int = 10
     max_accepted_words: int = 14
     docstring_max_words: int = 12
+    directory_max_words: int = 8
 
     # model and prompts
     model: str = DEFAULT_MODEL
@@ -85,6 +87,8 @@ class Config:
     no_ai: bool = False
     show_timing: bool = False
     stats: bool = False
+    no_color: bool = False
+    legend: bool = False
 
     # ollama lifecycle
     ollama_host: str = ""

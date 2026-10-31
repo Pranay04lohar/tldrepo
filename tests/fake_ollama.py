@@ -27,7 +27,10 @@ def _dynamic_answer(payload: dict) -> str:
         if message.get("role") == "user":
             user = str(message.get("content") or "")
     numbers = re.findall(r"FILE (\d+): (\S+)", user)
-    return "\n".join(f"{number}|Fake description" for number, _path in numbers)
+    if numbers:
+        return "\n".join(f"{number}|Fake description" for number, _path in numbers)
+    dirs = re.findall(r"DIR (\d+):", user)
+    return "\n".join(f"{number}|Fake directory purpose" for number in dirs)
 
 
 class FakeOllama:

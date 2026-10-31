@@ -390,6 +390,9 @@ def scan(root: Path, target: Path | None = None, cfg: Config | None = None) -> S
                 if entry.name in cfg.ignored_dirs:
                     bump("ignored-dir")
                     continue
+                if entry.name.startswith(".") and not cfg.show_all:
+                    bump("hidden-dir")
+                    continue
                 if apply_rules(local_rules, rel_path, True):
                     bump("gitignored")
                     continue

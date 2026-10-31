@@ -30,6 +30,7 @@ supported entry point and is what the Zsh function calls.
 | --- | --- |
 | `explain` | Analyse uncached or modified files, show the full map |
 | `explain --no-ai` | Tree from cache plus deterministic descriptions, never starts Ollama |
+| `explain --all` | Show dot-directories (`.git` and `.explain` stay hidden) |
 | `explain --refresh` | Regenerate all eligible descriptions |
 | `explain --depth 3` | Limit depth |
 | `explain --stats` | Language and file statistics |
@@ -39,6 +40,8 @@ supported entry point and is what the Zsh function calls.
 | `explain --fast` | Use the fast model |
 | `explain --budget N` | Time budget in seconds (default 25) |
 | `explain --timing` | Show per-phase timings |
+| `explain --no-color` | Disable ANSI colour (also honours `NO_COLOR` and non-TTY) |
+| `explain --legend` | Show a one-line colour legend under the footer |
 
 ## Design
 
@@ -51,6 +54,13 @@ supported entry point and is what the Zsh function calls.
   with more source, then fall back to a deterministic description.
 - Input to the model is skeleton, never full source (unless the file is tiny).
 - Cache lives in `<repo>/.explain/cache.json` and never contains source code.
+  Each description records its source (`llm`, `docstring`, `rule`, `fallback`)
+  so colour is information: LLM cyan, docstring/rule default, fallback dim
+  italic, directories bold purple, connectors/footer dim, footer numbers green.
+- Unknown directories are described by one batched LLM call per run (at most 8
+  words each), cached by the hash of their sorted children descriptions plus
+  model and prompt version. Built-in names win; `Contains N files` is the last
+  resort. Dot-directories are hidden unless `--all`.
 - The tool starts an Ollama server only if none is running, and stops only the
   process it started. No model stays resident after exit.
 

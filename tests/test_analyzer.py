@@ -318,6 +318,24 @@ def test_clean_description_rejects_empty_and_generic():
     assert clean_description("Parses command-line arguments and runs commands", cfg) is not None
 
 
+def test_filename_prefix_is_stripped_before_quality_checks():
+    cfg = Config()
+    assert (
+        clean_description(
+            "pipeline/load.py - reads and returns file content",
+            cfg,
+            path="pipeline/load.py",
+        )
+        == "Reads and returns file content"
+    )
+    assert (
+        clean_description(
+            "load.py: reads and returns file content", cfg, path="pipeline/load.py"
+        )
+        == "Reads and returns file content"
+    )
+
+
 def test_clean_path_normalises_separators():
     assert clean_path("./src\\main.py") == "src/main.py"
     assert clean_path('"src/x.py"') == "src/x.py"

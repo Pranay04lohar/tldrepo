@@ -106,7 +106,7 @@ def test_cache_is_written_and_reused(repo, capsys):
     assert cache_path.exists()
     assert (repo / ".explain" / ".gitignore").read_text().strip() == "*"
     payload = json.loads(cache_path.read_text())
-    assert payload["version"] == 2
+    assert payload["version"] == 3
     assert "tests/test_relevance.py" in payload["files"]
     assert "README.md" in payload["files"]
 
@@ -147,3 +147,30 @@ def test_parser_flags():
     args = parser.parse_args(["--no-ai", "--depth", "2", "--budget", "5", "src"])
     assert args.no_ai and args.depth == 2 and args.budget == 5 and args.path == "src"
     assert parser.parse_args([]).budget == 25.0
+
+
+def test_dot_directories_are_hidden_unless_all(repo, capsys):
+    (repo / ".agents" / "rules").mkdir(parents=True)
+    (repo / ".agents" / "rules" / "style.md").write_text("# Style\n", "utf-8")
+    run(["--no-ai"])
+    out = capsys.readouterr().out
+    assert ".agents" not in out
+    run(["--no-ai", "--all"])
+    out = capsys.readouterr().out
+    assert ".agents/" in out
+    assert ".git/" not in out
+
+
+def test_legend_is_opt_in(repo, capsys):
+    run(["--no-ai"])
+    assert "legend:" not in capsys.readouterr().out
+    run(["--no-ai", "--legend"])
+    out = capsys.readouterr().out
+    assert "legend:" in out
+    assert "LLM" in out
+
+
+def test_new_cli_flags():
+    parser = build_parser()
+    args = parser.parse_args(["--all", "--no-color", "--legend"])
+    assert args.all and args.no_color and args.legend

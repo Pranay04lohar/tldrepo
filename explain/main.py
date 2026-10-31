@@ -25,6 +25,7 @@ from .renderer import (
     RunStats,
     render_file_detail,
     render_footer,
+    render_legend,
     render_stats,
     render_timing,
     render_tree,
@@ -34,9 +35,12 @@ from .scanner import find_root, scan
 from .tiers import (
     TIER_DETERMINISTIC,
     assign,
+    directory_children,
     directory_description,
     directory_key,
     fallback_description,
+    plural,
+    source_for_reason,
 )
 from .tree_builder import build_tree, directory_nodes
 
@@ -48,6 +52,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("path", nargs="?", default=None, help="file or directory to describe")
     parser.add_argument("--no-ai", action="store_true", help="never start or contact Ollama")
+    parser.add_argument(
+        "--all", action="store_true", help="show dot-directories too (except .git and .explain)"
+    )
     parser.add_argument("--refresh", action="store_true", help="regenerate all descriptions")
     parser.add_argument("--depth", type=int, default=None, help="limit the displayed tree depth")
     parser.add_argument("--stats", action="store_true", help="show language statistics")
@@ -59,6 +66,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--budget", type=float, default=25.0, help="time budget in seconds (default 25)"
     )
     parser.add_argument("--timing", action="store_true", help="show per-phase timings")
+    parser.add_argument("--no-color", action="store_true", help="disable ANSI colour")
+    parser.add_argument("--legend", action="store_true", help="show a colour legend below the footer")
     return parser
 
 
@@ -74,6 +83,7 @@ class RunContext:
     metas: dict = field(default_factory=dict)
     decisions: dict = field(default_factory=dict)
     descriptions: dict = field(default_factory=dict)
+    description_sources: dict = field(default_factory=dict)
     stats: RunStats = field(default_factory=RunStats)
     pending: list = field(default_factory=list)
     started: float = 0.0
@@ -124,6 +134,9 @@ def run(argv: list[str] | None = None) -> int:
     elif args.fast:
         cfg.model = FAST_MODEL
     cfg.no_ai = args.no_ai
+    cfg.show_all = args.all
+    cfg.no_color = args.no_color
+    cfg.legend = args.legend
     cfg.refresh = args.refresh
     cfg.depth = args.depth
     cfg.stats = args.stats
@@ -132,7 +145,7 @@ def run(argv: list[str] | None = None) -> int:
     if cfg.budget == 0:
         cfg.no_ai = True
 
-    console = themed_console()
+    console = themed_console(no_color=cfg.no_color)
     stats = RunStats()
     started = time.perf_counter()
 
@@ -180,12 +193,12 @@ def run(argv: list[str] | None = None) -> int:
     )
 
     _resolve_known(ctx)
-    _describe_directories_deterministic(ctx)
 
     if not cfg.no_ai:
         _analyse(ctx)
     else:
         _fill_with_fallbacks(ctx)
+    _resolve_directories(ctx)
 
     render_started = time.perf_counter()
     if cfg.stats:
@@ -195,18 +208,26 @@ def run(argv: list[str] | None = None) -> int:
         meta = metas[entry.path]
         skeleton = build_skeleton(1, meta, [], cfg.skeleton_max_chars)
         render_file_detail(
-            console, entry, ctx.descriptions.get(entry.path, ""), skeleton_summary(meta)
+            console,
+            entry,
+            ctx.descriptions.get(entry.path, ""),
+            skeleton_summary(meta),
+            ctx.description_sources.get(entry.path),
         )
         console.print(
             f"  skeleton: {len(skeleton)} chars, ~{len(skeleton) // 4} tokens",
             style="footer",
         )
     else:
-        render_tree(console, tree, ctx.descriptions, cfg.depth)
+        render_tree(
+            console, tree, ctx.descriptions, cfg.depth, sources=ctx.description_sources
+        )
 
     stats.duration = time.perf_counter() - started
     _phase(stats, "render", render_started)
     render_footer(console, stats)
+    if cfg.legend:
+        render_legend(console)
     if cfg.show_timing:
         render_timing(console, stats)
     cache.save()
@@ -219,10 +240,18 @@ def _resolve_known(ctx: RunContext) -> None:
     for entry in ctx.result.files:
         decision = ctx.decisions[entry.path]
         if decision.tier == TIER_DETERMINISTIC and decision.description:
+            source = source_for_reason(decision.reason)
             ctx.descriptions[entry.path] = decision.description
+            ctx.description_sources[entry.path] = source
             ctx.stats.deterministic += 1
             ctx.cache.put_file(
-                entry.path, entry.digest, cfg.model, 0, decision.description, cfg.prompt_version
+                entry.path,
+                entry.digest,
+                cfg.model,
+                0,
+                decision.description,
+                cfg.prompt_version,
+                source=source,
             )
             continue
         cached = ctx.cache.get_file(
@@ -230,6 +259,9 @@ def _resolve_known(ctx: RunContext) -> None:
         )
         if cached:
             ctx.descriptions[entry.path] = cached
+            ctx.description_sources[entry.path] = ctx.cache.get_file_source(
+                entry.path, entry.digest, cfg.model, cfg.prompt_version
+            )
             ctx.stats.from_cache += 1
             continue
         pending.append(entry)
@@ -240,10 +272,18 @@ def _resolve_known(ctx: RunContext) -> None:
             continue
         original = ctx.descriptions.get(decision.duplicate_of)
         if original and entry.path not in ctx.descriptions:
+            source = ctx.description_sources.get(decision.duplicate_of, "rule")
             ctx.descriptions[entry.path] = original
+            ctx.description_sources[entry.path] = source
             ctx.stats.duplicate_reuse += 1
             ctx.cache.put_file(
-                entry.path, entry.digest, cfg.model, 0, original, cfg.prompt_version
+                entry.path,
+                entry.digest,
+                cfg.model,
+                0,
+                original,
+                cfg.prompt_version,
+                source=source,
             )
             pending.remove(entry)
 
@@ -255,36 +295,42 @@ def _fill_with_fallbacks(ctx: RunContext) -> None:
         meta = ctx.metas[entry.path]
         description = fallback_description(meta)
         ctx.descriptions[entry.path] = description
+        ctx.description_sources[entry.path] = "fallback"
         ctx.stats.deterministic += 1
 
 
-def _describe_directories_deterministic(ctx: RunContext) -> None:
+def _resolve_directories(ctx: RunContext) -> None:
+    """Apply built-in names, cached directory entries, then plural fallbacks."""
     known = ctx.descriptions
     for node in directory_nodes(ctx.tree):
         name = node.path.rpartition("/")[2]
         mapped = directory_description(name)
         if mapped:
             known[node.path] = mapped
+            ctx.description_sources[node.path] = "rule"
             continue
-        children = [
-            known[child.path]
-            for child in node.children
-            if child.path in known and not child.is_dir
-        ]
-        if children:
-            cached = ctx.cache.get_dir(directory_key(node.path, children))
-            if cached:
-                known[node.path] = cached
-                continue
-        if node.path:
-            files = sum(1 for child in node.walk() if not child.is_dir)
-            subdirs = sum(1 for child in node.walk() if child.is_dir and child is not node)
-            if files == 0 and subdirs == 0:
-                known[node.path] = "Empty directory"
-            elif subdirs:
-                known[node.path] = f"Contains {files} files and {subdirs} subdirectories"
-            else:
-                known[node.path] = f"Contains {files} files"
+        if node.path in known:
+            continue
+        children = directory_children(node, known)
+        key = directory_key(node.path, children)
+        cached = ctx.cache.get_dir(key, ctx.cfg.model, ctx.cfg.prompt_version)
+        if cached:
+            known[node.path] = cached
+            ctx.description_sources[node.path] = ctx.cache.get_dir_source(key)
+            continue
+        files = sum(1 for child in node.walk() if not child.is_dir)
+        subdirs = sum(1 for child in node.walk() if child.is_dir and child is not node)
+        if files == 0 and subdirs == 0:
+            description = "Empty directory"
+        elif subdirs:
+            description = (
+                f"Contains {plural(files, 'file')} and "
+                f"{plural(subdirs, 'subdirectory', 'subdirectories')}"
+            )
+        else:
+            description = f"Contains {plural(files, 'file')}"
+        known[node.path] = description
+        ctx.description_sources[node.path] = "fallback"
 
 
 def _analyse(ctx: RunContext) -> None:

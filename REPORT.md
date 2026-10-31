@@ -20,7 +20,7 @@ and only the skeleton is sent, never full source (except very small files).
 | `explain/ollama_manager.py` | server ownership, readiness, load/unload, cleanup |
 | `explain/analyzer.py` | batching, prompt, parsing, quality checks, source retry, budget |
 | `explain/renderer.py` | compact Rich tree, footer, progress line, `--timing` |
-| `tests/` | 121 tests, including a fake Ollama HTTP server |
+| `tests/` | 138 tests, including a fake Ollama HTTP server |
 
 ## Dependencies
 
@@ -70,7 +70,7 @@ the output root was the test repo, so the working directory is preserved.
 
 ## Tests
 
-`121 passed` in 3.8 s. Coverage includes scanning/gitignore/symlinks, tree and
+`138 passed` in 3.9 s. Coverage includes scanning/gitignore/symlinks, tree and
 width truncation, AST and regex metadata, tiers and duplicates, cache
 invalidation/recovery/atomic writes, batching and `num_ctx`, parsing and every
 quality check, same-model source retry and fallbacks, budget cut-off, real vs owned Ollama
@@ -83,9 +83,9 @@ of three.
 
 | Scenario | Target | Measured | scan | load | prefill | decode | cleanup | render |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Cold | < 20 s | 10.68 s | 0.00 | 0.52 | 1.87 | 6.70 | 0.01 | 0.00 |
+| Cold | < 20 s | 11.66 s | 0.00 | 0.72 | 1.99 | 7.07 | 0.01 | 0.00 |
 | Warm | < 2 s | 0.12 s | 0.00 | 0 | 0 | 0 | 0 | 0.00 |
-| Five modified | < 12 s | 2.88 s | 0.00 | 0.51 | 0.33 | 1.84 | 0.01 | 0.00 |
+| Five modified | < 12 s | 3.04 s | 0.00 | 0.61 | 0.33 | 1.91 | 0.01 | 0.00 |
 
 After every run `ollama ps` was empty. No process from our `Popen` handle
 remained. The pre-existing Ollama menu-bar app was left untouched.
@@ -95,7 +95,9 @@ remained. The pre-existing Ollama menu-bar app was left untouched.
 - lfm3 is terse but can speculate on mixed-directory batches; the spot check
   flagged 1 of 10 descriptions (“Compatibility layer for I/O streams on
   Windows” for `_compat.py`, which is broader than Windows).
-- Cold time varies with answer length (10.6 to 11.6 s on the same 17 files).
+- Cold time varies with answer length (11.0 to 12.2 s on the same 17 files).
+- One batched directory call can add ~5.1 s on a checkout with 17 unknown
+  directories; it is cached immediately, but exceeds the 2 s note threshold.
 - A very large checkout (226 files) can exceed the default 25 s budget; files
   left pending are described by deterministic fallbacks and picked up on the
   next run.

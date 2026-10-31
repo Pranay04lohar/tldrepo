@@ -1,7 +1,9 @@
 """JSON cache under ``<repo>/.explain/cache.json``.
 
-The cache stores descriptions and hashes, never source code. Writes are atomic
-and a malformed cache is backed up rather than trusted.
+The cache stores descriptions, source tags and hashes, never source code.
+Writes are atomic and a malformed cache is backed up rather than trusted.
+Version 2 caches are migrated in place: every old file becomes ``llm`` or
+``rule``, every old directory becomes ``rule``.
 """
 
 from __future__ import annotations
@@ -12,6 +14,8 @@ import tempfile
 from pathlib import Path
 
 from .config import CACHE_VERSION, PROMPT_VERSION
+
+SOURCES = {"llm", "docstring", "rule", "fallback"}
 
 
 class Cache:
@@ -58,22 +62,85 @@ class Cache:
             self._backup()
             self.recovered = True
             return self
-        if not isinstance(raw, dict) or raw.get("version") != self.version:
+        if not isinstance(raw, dict):
             self._backup()
             self.recovered = True
             return self
+
+        version = raw.get("version")
         files = raw.get("files")
         dirs = raw.get("dirs")
+        if version == 2:
+            migrated = self._migrate_v2(files, dirs)
+            if migrated is None:
+                self._backup()
+                self.recovered = True
+                return self
+            self.data = migrated
+            self.dirty = True
+            return self
+        if version != self.version:
+            self._backup()
+            self.recovered = True
+            return self
         if not isinstance(files, dict) or not isinstance(dirs, dict):
             self._backup()
             self.recovered = True
             return self
         self.data = {
             "version": self.version,
-            "files": {k: v for k, v in files.items() if isinstance(v, dict)},
-            "dirs": {k: v for k, v in dirs.items() if isinstance(v, str)},
+            "files": {
+                k: self._clean_file_entry(v) for k, v in files.items() if isinstance(v, dict)
+            },
+            "dirs": {
+                k: self._clean_dir_entry(v) for k, v in dirs.items() if isinstance(v, dict)
+            },
         }
         return self
+
+    def _migrate_v2(self, files, dirs) -> dict | None:
+        if not isinstance(files, dict) or not isinstance(dirs, dict):
+            return None
+        migrated_files = {}
+        for path, entry in files.items():
+            if not isinstance(entry, dict):
+                continue
+            source = "rule" if entry.get("tier") == 0 else "llm"
+            migrated_files[path] = {
+                "hash": entry.get("hash", ""),
+                "model": entry.get("model", ""),
+                "prompt_version": entry.get("prompt_version", PROMPT_VERSION),
+                "tier": entry.get("tier", 1),
+                "description": entry.get("description", ""),
+                "source": source,
+            }
+        migrated_dirs = {}
+        for key, value in dirs.items():
+            if isinstance(value, str):
+                migrated_dirs[key] = {
+                    "description": value,
+                    "source": "rule",
+                    "model": "",
+                    "prompt_version": 0,
+                }
+        return {"version": self.version, "files": migrated_files, "dirs": migrated_dirs}
+
+    def _clean_file_entry(self, entry: dict) -> dict:
+        source = entry.get("source")
+        if source not in SOURCES:
+            source = "rule" if entry.get("tier") == 0 else "llm"
+        return {**entry, "source": source}
+
+    def _clean_dir_entry(self, entry: dict) -> dict:
+        source = entry.get("source")
+        if source not in SOURCES:
+            source = "llm"
+        return {
+            "description": str(entry.get("description", "")),
+            "source": source,
+            "model": str(entry.get("model", "")),
+            "prompt_version": int(entry.get("prompt_version") or 0),
+        }
 
     def save(self, force: bool = False) -> bool:
         if not self.dirty and not force:
@@ -128,6 +195,21 @@ class Cache:
             return None
         return description
 
+    def get_file_source(
+        self,
+        path: str,
+        digest: str,
+        model: str,
+        prompt_version: int = PROMPT_VERSION,
+    ) -> str:
+        entry = self.data["files"].get(path)
+        if not isinstance(entry, dict):
+            return "rule"
+        source = entry.get("source")
+        if source in SOURCES:
+            return source
+        return "rule" if entry.get("tier") == 0 else "llm"
+
     def put_file(
         self,
         path: str,
@@ -136,14 +218,17 @@ class Cache:
         tier: int,
         description: str,
         prompt_version: int = PROMPT_VERSION,
+        source: str = "rule",
     ) -> None:
         existing = self.data["files"].get(path)
+        source = source if source in SOURCES else ("rule" if tier == 0 else "llm")
         new_entry = {
             "hash": digest,
             "model": model,
             "prompt_version": prompt_version,
             "tier": tier,
             "description": description,
+            "source": source,
         }
         if existing != new_entry:
             self.data["files"][path] = new_entry
@@ -165,13 +250,52 @@ class Cache:
 
     # -- directories -------------------------------------------------------
 
-    def get_dir(self, key: str) -> str | None:
-        value = self.data["dirs"].get(key)
-        return value if isinstance(value, str) and value else None
+    def _dir_entry(self, key: str) -> dict | None:
+        entry = self.data["dirs"].get(key)
+        if isinstance(entry, str):
+            return {"description": entry, "source": "rule", "model": "", "prompt_version": 0}
+        return entry if isinstance(entry, dict) else None
 
-    def put_dir(self, key: str, description: str) -> None:
-        if self.data["dirs"].get(key) != description:
-            self.data["dirs"][key] = description
+    def get_dir(
+        self,
+        key: str,
+        model: str | None = None,
+        prompt_version: int | None = None,
+    ) -> str | None:
+        entry = self._dir_entry(key)
+        if not entry:
+            return None
+        description = entry.get("description")
+        if not isinstance(description, str) or not description:
+            return None
+        if model is not None and entry.get("model") != model:
+            return None
+        if prompt_version is not None and entry.get("prompt_version") != prompt_version:
+            return None
+        return description
+
+    def get_dir_source(self, key: str) -> str:
+        entry = self._dir_entry(key)
+        source = entry.get("source") if entry else None
+        return source if source in SOURCES else "rule"
+
+    def put_dir(
+        self,
+        key: str,
+        description: str,
+        model: str = "",
+        prompt_version: int = 0,
+        source: str = "llm",
+    ) -> None:
+        source = source if source in SOURCES else "llm"
+        new_entry = {
+            "description": description,
+            "source": source,
+            "model": model,
+            "prompt_version": prompt_version,
+        }
+        if self._dir_entry(key) != new_entry:
+            self.data["dirs"][key] = new_entry
             self.dirty = True
 
     # -- introspection -----------------------------------------------------

@@ -408,11 +408,35 @@ def fallback_description(meta: FileMetadata) -> str:
     return f"{meta.language} file"
 
 
+def plural(count: int, singular: str, plural_form: str | None = None) -> str:
+    word = singular if count == 1 else (plural_form or singular + "s")
+    return f"{count} {word}"
+
+
 def directory_key(dir_path: str, child_descriptions: list[str]) -> str:
     import hashlib
 
     payload = dir_path + "\n" + "\n".join(sorted(child_descriptions))
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def directory_children(node, descriptions: dict[str, str]) -> list[str]:
+    """Descriptions of a directory's direct children, for cache keys and prompts."""
+    values: list[str] = []
+    for child in node.children:
+        description = descriptions.get(child.path)
+        if child.is_dir:
+            if description:
+                values.append(f"{child.name}/: {description}")
+            else:
+                values.append(f"{child.name}/")
+        elif description:
+            values.append(description)
+    return values
+
+
+def source_for_reason(reason: str) -> str:
+    return "docstring" if reason == "docstring" else "rule"
 
 
 DIRECTORY_NAMES = {

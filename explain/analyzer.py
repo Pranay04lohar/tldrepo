@@ -26,7 +26,13 @@ from .ollama_manager import (
     OllamaError,
     OllamaManager,
 )
-from .tiers import fallback_description
+from .tiers import (
+    directory_children,
+    directory_description,
+    directory_key,
+    fallback_description,
+)
+from .tree_builder import directory_nodes
 
 SYSTEM_PROMPT = """You describe source files for a codebase map.
 For each numbered file below, write ONE description.
@@ -127,7 +133,8 @@ def analyse(ctx) -> AnalysisSummary:
     entries = [entry for entry in ctx.pending if entry.path not in ctx.descriptions]
     summary = AnalysisSummary(model=cfg.model)
     ctx._fallback_paths = set()
-    if not entries:
+    ctx.description_sources = getattr(ctx, "description_sources", {})
+    if not entries and not _directory_candidates(ctx):
         return summary
 
     ctx.stats.model = cfg.model
@@ -151,7 +158,7 @@ def analyse(ctx) -> AnalysisSummary:
     load_started = time.perf_counter()
     loader.start()
 
-    batches = build_batches(ctx, entries)
+    batches = build_batches(ctx, entries) if entries else []
     if batches:
         noun = "request" if len(batches) == 1 else "requests"
         ctx.console.print(
@@ -202,19 +209,22 @@ def analyse(ctx) -> AnalysisSummary:
 
     missing = [entry for entry in entries if entry.path not in ctx.descriptions]
     rejected = {entry.path for entry in failed}
+    pending_stop = summary.stopped in {"budget", "connection", "model"}
     if missing:
         _fill_fallbacks(
             ctx,
             cache_paths=rejected if summary.stopped in {"", "incomplete"} else None,
+            source="pending" if pending_stop else "fallback",
         )
     if missing and not summary.stopped:
         summary.stopped = "incomplete"
     summary.described = described_total
     summary.failed = len(missing)
     ctx.stats.analysed_by_ai = described_total
-    ctx.stats.pending = (
-        len(missing) if summary.stopped in {"budget", "connection", "model"} else 0
-    )
+    ctx.stats.pending = len(missing) if pending_stop else 0
+
+    if summary.stopped not in {"budget", "connection", "model"} and not _out_of_time(ctx):
+        _describe_unknown_directories(ctx, manager, cfg, summary)
 
     cleanup_started = time.perf_counter()
     try:
@@ -224,6 +234,135 @@ def analyse(ctx) -> AnalysisSummary:
         pass
     _phase(ctx, "cleanup", cleanup_started)
     return summary
+
+
+DIRECTORY_PROMPT = """You name directories in a codebase map.
+For each numbered directory, write ONE purpose using the children descriptions.
+
+Rules:
+- Output exactly one line per directory: <number>|<purpose>
+- Maximum 8 words. State WHAT the directory is for as a group.
+- Summarise the children's shared role; do not copy one child description.
+- Use only the evidence given. Do not invent functionality.
+- Never repeat the directory name and do not start with "This directory".
+- If the purpose is unclear, write: <number>|unclear
+- No extra text, no markdown, no backticks.
+
+Example:
+DIR 1: billing
+Children: Builds invoices; Totals line items
+-> 1|Invoice construction and total calculation"""
+
+
+def _directory_candidates(ctx) -> list[dict]:
+    """Unknown directories, deepest first, after built-ins and cached results."""
+    cfg = ctx.cfg
+    descriptions = ctx.descriptions
+    sources = getattr(ctx, "description_sources", {})
+    candidates: list[dict] = []
+    for node in reversed(directory_nodes(ctx.tree)):
+        name = node.name
+        mapped = directory_description(name)
+        if mapped:
+            if node.path not in descriptions:
+                descriptions[node.path] = mapped
+                sources[node.path] = "rule"
+            continue
+        children = directory_children(node, descriptions)
+        key = directory_key(node.path, children)
+        cached = ctx.cache.get_dir(key, cfg.model, cfg.prompt_version)
+        if cached:
+            if node.path not in descriptions:
+                descriptions[node.path] = cached
+                sources[node.path] = ctx.cache.get_dir_source(key)
+            continue
+        candidates.append(
+            {"node": node, "path": node.path, "name": name, "children": children, "key": key}
+        )
+    return candidates
+
+
+def _describe_unknown_directories(ctx, manager, cfg: Config, summary: AnalysisSummary) -> None:
+    candidates = _directory_candidates(ctx)
+    if not candidates:
+        return
+    lines = []
+    numbers: dict[str, dict] = {}
+    for index, candidate in enumerate(candidates, start=1):
+        numbers[str(index)] = candidate
+        child_text = "; ".join(candidate["children"][:8]) or "(no known children)"
+        lines.append(f"DIR {index}: {candidate['name']}\nChildren: {child_text}")
+    body = "\n\n".join(lines)
+    batch = Batch(files=[], user_prompt=body + f"\n\nDescribe these {len(candidates)} directories.")
+    try:
+        payload = manager.chat(
+            cfg.model,
+            [
+                {"role": "system", "content": DIRECTORY_PROMPT},
+                {"role": "user", "content": batch.user_prompt},
+            ],
+            options={
+                "temperature": 0,
+                "num_ctx": min(cfg.max_num_ctx, 2048),
+                "num_predict": max(80, 24 * len(candidates)),
+            },
+            keep_alive=0,
+            timeout=_request_timeout(ctx),
+        )
+    except (OllamaError, OSError):
+        return
+    summary.requests += 1
+    summary.tokens_in += int(payload.get("prompt_eval_count") or 0)
+    summary.tokens_out += int(payload.get("eval_count") or 0)
+    summary.merge(
+        Usage(
+            requests=0,
+            tokens_in=0,
+            tokens_out=0,
+            prefill=int(payload.get("prompt_eval_duration") or 0) / 1e9,
+            decode=int(payload.get("eval_duration") or 0) / 1e9,
+        )
+    )
+    _phase_add(ctx, "prefill", int(payload.get("prompt_eval_duration") or 0) / 1e9)
+    _phase_add(ctx, "decode", int(payload.get("eval_duration") or 0) / 1e9)
+    parsed = _parse_directory_lines(_content(payload), numbers, cfg)
+    for number, candidate in numbers.items():
+        description = parsed.get(number)
+        if not description:
+            continue
+        ctx.descriptions[candidate["path"]] = description
+        ctx.description_sources[candidate["path"]] = "llm"
+    for candidate in candidates:
+        node = candidate["node"]
+        if node.path not in ctx.descriptions:
+            continue
+        children = directory_children(node, ctx.descriptions)
+        key = directory_key(node.path, children)
+        ctx.cache.put_dir(
+            key,
+            ctx.descriptions[node.path],
+            cfg.model,
+            cfg.prompt_version,
+            source="llm",
+        )
+
+
+def _parse_directory_lines(text: str, numbers: dict[str, dict], cfg: Config) -> dict[str, str]:
+    body = FENCE.sub("", text or "").strip()
+    result: dict[str, str] = {}
+    for line in body.splitlines():
+        match = LINE.match(line)
+        if not match:
+            continue
+        number, raw = match.group(1), match.group(2)
+        if number not in numbers or number in result:
+            continue
+        description = clean_description(
+            raw, cfg, path="", max_words=cfg.directory_max_words
+        )
+        if description:
+            result[number] = description
+    return result
 
 
 def _phase(ctx, name: str, started: float) -> None:
@@ -410,6 +549,8 @@ def _commit(ctx, batch: Batch, parsed: dict[str, str], failed: list) -> int:
             failed.append(entry)
             continue
         ctx.descriptions[entry.path] = description
+        ctx.description_sources = getattr(ctx, "description_sources", {})
+        ctx.description_sources[entry.path] = "llm"
         ctx.cache.put_file(
             entry.path,
             entry.digest,
@@ -417,6 +558,7 @@ def _commit(ctx, batch: Batch, parsed: dict[str, str], failed: list) -> int:
             0,
             description,
             ctx.cfg.prompt_version,
+            source="llm",
         )
         added += 1
     return added
@@ -462,12 +604,16 @@ def _retry_with_more_source(
     return added
 
 
-def _fill_fallbacks(ctx, cache_paths: set[str] | None = None) -> None:
+def _fill_fallbacks(
+    ctx, cache_paths: set[str] | None = None, source: str = "fallback"
+) -> None:
     for entry in ctx.pending:
         if entry.path in ctx.descriptions:
             continue
         description = fallback_description(ctx.metas[entry.path])
         ctx.descriptions[entry.path] = description
+        ctx.description_sources = getattr(ctx, "description_sources", {})
+        ctx.description_sources[entry.path] = source
         ctx._fallback_paths.add(entry.path)
         ctx.stats.fallbacks += 1
         if cache_paths and entry.path in cache_paths:
@@ -478,6 +624,7 @@ def _fill_fallbacks(ctx, cache_paths: set[str] | None = None) -> None:
                 0,
                 description,
                 ctx.cfg.prompt_version,
+                source="fallback",
             )
 
 
@@ -563,7 +710,9 @@ def clean_path(path: str) -> str:
     return value
 
 
-def clean_description(text: str, cfg: Config, path: str = "") -> str | None:
+def clean_description(
+    text: str, cfg: Config, path: str = "", max_words: int | None = None
+) -> str | None:
     value = text.strip().strip("\"'`").replace("`", "")
     value = re.sub(r"^[\s>*\-•]+", "", value)
     value = re.sub(r"\s+", " ", value)
@@ -571,6 +720,15 @@ def clean_description(text: str, cfg: Config, path: str = "") -> str | None:
     if not value:
         return None
     lowered = value.lower()
+    if path:
+        name = path.rpartition("/")[2].lower()
+        for prefix in (path.lower(), name):
+            if prefix and lowered.startswith(prefix):
+                rest = value[len(prefix) :].lstrip(" -:\u2013\u2014.\t")
+                if rest:
+                    value = rest
+                    lowered = value.lower()
+                break
     if "unclear" in lowered:
         return None
 
@@ -583,10 +741,12 @@ def clean_description(text: str, cfg: Config, path: str = "") -> str | None:
         return None
 
     words = value.split()
-    if len(words) > cfg.max_accepted_words:
-        value = " ".join(words[: cfg.docstring_max_words]).rstrip(",;:")
+    limit = max_words or cfg.max_accepted_words
+    trimmed = max_words or cfg.docstring_max_words
+    if len(words) > limit:
+        value = " ".join(words[:trimmed]).rstrip(",;:")
     if len(value) > 120:
         value = value[:120].rsplit(" ", 1)[0]
     if len(value.split()) < 2:
         return None
-    return value
+    return value[:1].upper() + value[1:]

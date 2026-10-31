@@ -127,11 +127,13 @@ def test_symlinks_are_not_followed(tmp_path):
     assert result.skipped["symlink"] == 2
 
 
-def test_hidden_files_are_included(tmp_path):
+def test_hidden_files_are_included_but_dot_directories_are_not(tmp_path):
     write(tmp_path / ".env", "A=1\n")
     write(tmp_path / ".github" / "workflow.yml", "on: push\n")
     result = scan(tmp_path, cfg=Config())
-    assert paths(result) == {".env", ".github/workflow.yml"}
+    assert paths(result) == {".env"}
+    shown = scan(tmp_path, cfg=Config(show_all=True))
+    assert paths(shown) == {".env", ".github/workflow.yml"}
 
 
 def test_target_subtree_limits_scan(tmp_path):
@@ -195,3 +197,17 @@ def test_unreadable_file_is_skipped_gracefully(tmp_path):
 )
 def test_language_for(name, expected):
     assert language_for(Path(name)) == expected
+
+
+def test_dot_directories_need_all_and_git_explain_stay_hidden(tmp_path):
+    write(tmp_path / ".agents" / "rule.md", "x\n")
+    write(tmp_path / ".git" / "config", "x\n")
+    write(tmp_path / ".explain" / "cache.json", "{}\n")
+    write(tmp_path / "src" / "app.py", "x = 1\n")
+    default = scan(tmp_path, cfg=Config())
+    assert ".agents/rule.md" not in paths(default)
+    assert paths(default) == {"src/app.py"}
+    shown = scan(tmp_path, cfg=Config(show_all=True))
+    assert ".agents/rule.md" in paths(shown)
+    assert ".git/config" not in paths(shown)
+    assert ".explain/cache.json" not in paths(shown)

@@ -141,3 +141,42 @@ rerun still makes progress. `--no-ai` still never writes fallbacks (A5).
 `.bench/` holds the cloned `pallets/flask` corpus, the 15-file subset, the
 benchmark script and raw results. It is in `.gitignore`; only the summarized
 numbers and the grading table are kept in BENCHMARKS.md.
+
+## Post-Gate C improvements
+
+### I1. Directory descriptions: built-in, one batched LLM call, fallback
+
+Resolution order is the built-in name map, one LLM request for every remaining
+unknown directory, then `Contains N files`. The request is capped at 8 words
+per directory and uses each directory's children descriptions; quality checks
+reuse the file cleaner (vague phrases, filename repetition) with an 8-word
+limit. Results are cached under `hash(path + sorted child descriptions)` plus
+the model and prompt version, so a warm run makes no directory request.
+
+### I2. Dot-directories are opt-in
+
+Directories whose name starts with `.` are skipped by default and counted as
+`hidden-dir`. `--all` shows them, but `.git` and `.explain` remain in the
+built-in ignore set at every setting.
+
+### I3. Colour is driven by cache `source`
+
+Cache version 3 stores `source` per file and per directory. The renderer uses
+it: bold purple directories, dim connectors/footer labels, green footer
+numbers, cyan LLM descriptions, default docstring/rule, dim italic
+fallback/pending. Version 2 caches migrate in place (`tier 0` → `rule`,
+otherwise `llm`; old directory strings → `rule`). `NO_COLOR`, non-TTY output
+and `--no-color` all disable ANSI; `--legend` is opt-in.
+
+### I4. Pluralisation
+
+`plural()` is used for directory fallbacks, footer pending counts, progress and
+statistics: `1 file`, `2 files`, `1 subdirectory`, `2 subdirectories`.
+
+### I5. Directory-call cost
+
+On a 157-file click checkout with 17 unknown directories, the single directory
+request added 5.1 s to an otherwise warm run (0.17 s → 5.26 s), which is over
+the 2 s note threshold. It is one request, cached afterwards; the warm run
+returns to 0.17 s and the benchmark target `src/click` has no unknown
+subdirectories, so its cold/warm numbers are unaffected.

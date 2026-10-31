@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 from pathlib import Path
 
 from rich.console import Console
@@ -10,8 +11,10 @@ from explain.renderer import (
     RunStats,
     render_footer,
     render_stats,
+    render_legend,
     render_timing,
     render_tree,
+    themed_console,
     truncate,
 )
 from explain.scanner import ScannedFile, ScanResult
@@ -113,15 +116,24 @@ def test_footer_and_timing_render():
     render_footer(console, stats)
     render_timing(console, stats)
     out = plain(console)
-    assert "5 scanned" in out and "2 by AI" in out and "1 cached" in out
+    assert "5 files scanned" in out and "2 files by AI" in out and "1 file cached" in out
     assert "timing: scan 0.10s" in out
+
+
+def test_footer_pluralises_file_counts():
+    console = capture()
+    render_footer(console, RunStats(files_scanned=1, analysed_by_ai=1, duration=1.0))
+    out = plain(console)
+    assert "1 file scanned" in out
+    assert "1 file by AI" in out
+    assert "1 files" not in out
 
 
 def test_pending_files_are_reported():
     console = capture()
     render_footer(console, RunStats(files_scanned=9, pending=4, duration=25.0))
     out = plain(console)
-    assert "4 pending" in out
+    assert "4 files pending" in out
     assert "run explain again" in out
 
 
@@ -157,3 +169,54 @@ def test_progress_emits_a_single_updating_line_on_tty():
         progress.update(1)
     out = plain(console)
     assert "Analysing 4 files... 1/4" in out
+
+
+def test_colour_follows_description_source_and_directories_are_purple(monkeypatch):
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    stream = io.StringIO()
+    console = themed_console(file=stream, force_terminal=True, width=100)
+    render_tree(
+        console,
+        node_tree(),
+        {"src": "Source code", "src/main.py": "Parses arguments", "README.md": "Read me"},
+        sources={"src": "rule", "src/main.py": "llm", "README.md": "fallback"},
+    )
+    out = stream.getvalue()
+    assert "\x1b[" in out
+    assert "35m" in out  # bold magenta directory
+    assert "36m" in out  # cyan LLM description
+    assert "2;3m" in out or "3;2m" in out  # dim italic fallback
+
+
+def test_no_color_strips_ansi(monkeypatch):
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    stream = io.StringIO()
+    console = themed_console(file=stream, force_terminal=True, no_color=True, width=100)
+    render_tree(console, node_tree(), {"src": "Source code"}, sources={"src": "rule"})
+    assert "\x1b[" not in stream.getvalue()
+
+
+def test_non_tty_output_has_no_escape_codes(monkeypatch):
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    stream = io.StringIO()
+    console = themed_console(file=stream, force_terminal=False, width=100)
+    render_tree(console, node_tree(), {"src": "Source code"}, sources={"src": "llm"})
+    assert "\x1b[" not in stream.getvalue()
+
+
+def test_no_color_environment_variable_is_respected(monkeypatch):
+    monkeypatch.setenv("NO_COLOR", "1")
+    stream = io.StringIO()
+    console = themed_console(file=stream, force_terminal=True, width=100)
+    render_tree(console, node_tree(), {"src": "Source code"})
+    assert "\x1b[" not in stream.getvalue()
+
+
+def test_legend_mentions_all_sources():
+    console = capture()
+    render_legend(console)
+    out = plain(console)
+    assert "legend:" in out
+    assert "LLM" in out
+    assert "docstring/rule" in out
+    assert "fallback/pending" in out

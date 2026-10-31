@@ -27,7 +27,7 @@ def build(tmp_path: Path, files: dict[str, str]):
         path = tmp_path / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, "utf-8")
-    result = scan(tmp_path, cfg=Config())
+    result = scan(tmp_path, cfg=Config(show_all=True))
     metas = {entry.path: analyze(entry, tmp_path) for entry in result.files}
     return result.files, metas
 
