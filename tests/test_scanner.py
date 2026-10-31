@@ -163,6 +163,14 @@ def test_digest_is_stable_and_content_addressed(tmp_path):
     assert by_name["a.py"].digest != by_name["b.py"].digest
 
 
+def test_single_file_target(tmp_path):
+    (tmp_path / ".git").mkdir()
+    write(tmp_path / "src" / "main.py", "print(1)\n")
+    result = scan(tmp_path, target=tmp_path / "src" / "main.py", cfg=Config())
+    assert paths(result) == {"src/main.py"}
+    assert result.files[0].language == "Python"
+
+
 def test_unreadable_file_is_skipped_gracefully(tmp_path):
     path = write(tmp_path / "secret.py")
     path.chmod(0o000)

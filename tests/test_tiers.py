@@ -140,6 +140,8 @@ def test_test_module_name_forms():
 def test_doc_and_config_detection():
     assert is_doc_path("README.md")
     assert is_doc_path("docs/architecture.md")
+    assert is_doc_path("CONTRIBUTING.rst")
+    assert is_doc_path("PROGRESS.md")
     assert not is_doc_path("src/main.py")
     assert is_config_path("pyproject.toml")
     assert not is_config_path("src/config.py")

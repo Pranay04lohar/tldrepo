@@ -254,6 +254,46 @@ class ScanResult:
 # ---------------------------------------------------------------------------
 
 
+def _scan_single(root: Path, target: Path, cfg: Config, result: ScanResult) -> None:
+    try:
+        rel_path = target.relative_to(root).as_posix()
+    except ValueError:
+        rel_path = target.name
+    try:
+        size = target.stat().st_size
+    except OSError:
+        result.skipped["unreadable"] = 1
+        return
+    suffix = target.suffix.lower()
+    reason = _skip_reason(target.name, suffix, size, cfg)
+    if reason:
+        result.skipped[reason] = 1
+        return
+    try:
+        with open(target, "rb") as handle:
+            head = handle.read(8192)
+            if _is_binary(head):
+                result.skipped["binary"] = 1
+                return
+            digest = hashlib.sha256()
+            digest.update(head)
+            for chunk in iter(lambda: handle.read(65536), b""):
+                digest.update(chunk)
+    except OSError:
+        result.skipped["unreadable"] = 1
+        return
+    result.files.append(
+        ScannedFile(
+            path=rel_path,
+            abspath=target,
+            size=size,
+            language=language_for(target),
+            digest=digest.hexdigest(),
+            is_empty=size == 0,
+        )
+    )
+
+
 def find_root(start: Path) -> Path:
     current = start.resolve()
     if current.is_file():
@@ -298,6 +338,10 @@ def scan(root: Path, target: Path | None = None, cfg: Config | None = None) -> S
         target_rel = ""
 
     result = ScanResult(root=root, target=target)
+    if target.is_file():
+        _scan_single(root, target, cfg, result)
+        result.files.sort(key=lambda f: f.path.lower())
+        return result
     rules: list[IgnoreRule] = []
     root_gitignore = root / GITIGNORE
     if root_gitignore.is_file():

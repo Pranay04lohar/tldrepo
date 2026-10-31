@@ -2,6 +2,8 @@
 
 ## Phase A: deterministic core (steps 1 to 8)
 
+Gate A: 90 tests pass; `explain --no-ai` renders this repo in 0.02 s.
+
 - [x] Step 1: environment inspected and logged in DECISIONS.md
 - [x] Step 2: project scaffolding, pyproject, git
 - [x] Step 3: scanner with .gitignore support
@@ -9,7 +11,7 @@
 - [x] Step 5: metadata and skeleton extraction (49 tests green)
 - [x] Step 6: tiering and deterministic descriptions
 - [x] Step 7: cache
-- [ ] Step 8: CLI wiring; Gate A
+- [x] Step 8: CLI wiring; **Gate A passed**
 
 ## Phase B: Ollama, batching, cache, benchmark (steps 9 to 13)
 

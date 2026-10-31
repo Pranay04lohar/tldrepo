@@ -154,9 +154,9 @@ def is_doc_path(path: str) -> bool:
     name = parts[-1].lower()
     if name in DOC_NAMES:
         return True
-    if parts[0].lower() in {"docs", "doc", "documentation"} and name.endswith(
-        (".md", ".rst", ".txt", ".adoc")
-    ):
+    if name.endswith((".md", ".rst", ".adoc")):
+        return True
+    if parts[0].lower() in {"docs", "doc", "documentation"} and name.endswith(".txt"):
         return True
     return False
 
@@ -222,7 +222,7 @@ def usable_docstring(meta: FileMetadata, cfg: Config) -> str | None:
         return None
     if lowered.endswith("module") or lowered.startswith("this module"):
         return None
-    if re.fullmatch(r"[\w\s-]+", sentence) and len(words) <= 2:
+    if re.fullmatch(r"[\w\s-]+", sentence) and len(words) == 1:
         return None
     return sentence[:1].upper() + sentence[1:]
 
@@ -383,6 +383,36 @@ def _reuse_duplicate_hashes(
             decision.priority = 0
         else:
             decision.reason = "duplicate-content-pending"
+
+
+def fallback_description(meta: FileMetadata) -> str:
+    """Deterministic stand-in when no model description is available."""
+    if meta.classes:
+        primary = meta.classes[0]
+        methods = sum(1 for name in meta.functions if name.startswith(primary + "."))
+        if methods:
+            return f"{meta.language} module: {primary} ({methods} methods)"
+        return f"{meta.language} module: {primary}"
+    if meta.functions:
+        primary = meta.functions[0]
+        extra = len(meta.functions) - 1
+        return f"{meta.language} module: {primary}" + (
+            f" (+{extra} functions)" if extra else ""
+        )
+    if meta.declarations:
+        first = meta.declarations[0]
+        first = re.sub(r"^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?", "", first)
+        words = first.split()
+        label = " ".join(words[:4])
+        return f"{meta.language} file: {label}"
+    return f"{meta.language} file"
+
+
+def directory_key(dir_path: str, child_descriptions: list[str]) -> str:
+    import hashlib
+
+    payload = dir_path + "\n" + "\n".join(sorted(child_descriptions))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
 DIRECTORY_NAMES = {

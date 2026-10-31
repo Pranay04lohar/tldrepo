@@ -51,7 +51,19 @@ section 14, is one process cheaper than `uv run`, and does not depend on
 `uv run`'s path handling. The venv is pinned to CPython 3.12.16 (the `ollama`
 Homebrew install pulled in 3.15, which uv would otherwise select).
 
-### A4. `.gitignore` files are scanned
+### A4. Cache pruning only on a full-repo scan
+
+Stale entries are removed only when the scan target is the repository root. A
+subtree scan (`explain src/`) leaves entries for other directories intact, so a
+later full run still has them.
+
+### A5. `--no-ai` never writes fallbacks into the cache
+
+Deterministic Tier 0 descriptions are cached (they are model-independent).
+Metadata fallbacks for Tier 1 files are rendered but not cached, so a later
+AI run is not blocked by a placeholder description.
+
+### A6. `.gitignore` files are scanned
 
 `.gitignore` itself is kept as a file entry (a useful one-liner in the map) and
 is described deterministically. Ignore rules are still honoured; only the rule
